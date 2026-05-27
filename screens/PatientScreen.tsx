@@ -479,8 +479,8 @@ const styles = StyleSheet.create({
   // Modal shared
   modalOuter: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%', flexShrink: 1 },
-  presetsScroll: { flexShrink: 1 },
+  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '78%' },
+  presetsScroll: { flex: 1 },
   customSection: { paddingHorizontal: 24, paddingTop: 8, zIndex: 10 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 12 },
   sheetTitle: { fontSize: 20, fontWeight: '600', color: '#1C1C1E' },
