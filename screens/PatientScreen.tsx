@@ -250,8 +250,13 @@ export default function PatientScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
-              {/* Type pills */}
+            {/* Type pills + preset grid — scrollable, shrinks when keyboard appears */}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.sheetContent}
+              style={styles.presetsScroll}
+            >
               <View style={styles.typePills}>
                 {(['timer', 'task'] as ItemType[]).map(type => (
                   <TouchableOpacity
@@ -266,7 +271,6 @@ export default function PatientScreen() {
                 ))}
               </View>
 
-              {/* Timer: preset grid */}
               {selectedType === 'timer' && (
                 <>
                   <View style={styles.presetGrid}>
@@ -284,8 +288,10 @@ export default function PatientScreen() {
                   </View>
                 </>
               )}
+            </ScrollView>
 
-              {/* Custom label + autocomplete */}
+            {/* Fixed bottom: label → picker → signout — always visible above keyboard */}
+            <View style={styles.customSection}>
               <View style={styles.inputWrapper}>
                 <TextInput
                   ref={labelRef}
@@ -295,8 +301,8 @@ export default function PatientScreen() {
                   value={customLabel}
                   onChangeText={t => { setCustomLabel(t); setShowSuggestions(true); }}
                   onFocus={() => setShowSuggestions(true)}
-                  returnKeyType={selectedType === 'task' ? 'done' : 'next'}
-                  onSubmitEditing={selectedType === 'task' && canAddCustom ? addCustom : undefined}
+                  returnKeyType="done"
+                  onSubmitEditing={canAddCustom ? addCustom : undefined}
                 />
                 {showSuggestions && suggestions.length > 0 && (
                   <View style={styles.dropdown}>
@@ -310,7 +316,6 @@ export default function PatientScreen() {
                 )}
               </View>
 
-              {/* Duration picker (timer only) */}
               {selectedType === 'timer' && (
                 <DurationPicker
                   hours={pickerH}
@@ -320,14 +325,13 @@ export default function PatientScreen() {
                 />
               )}
 
-              {/* Signout toggle */}
               <TouchableOpacity style={styles.signoutToggleRow} onPress={() => setFlagSignout(v => !v)}>
                 <View style={[styles.signoutToggleBox, flagSignout && styles.signoutToggleBoxChecked]}>
                   {flagSignout && <Text style={styles.signoutToggleCheck}>✓</Text>}
                 </View>
                 <Text style={styles.signoutToggleLabel}>Flag for signout</Text>
               </TouchableOpacity>
-            </ScrollView>
+            </View>
 
             <View style={styles.sheetFooter}>
               <TouchableOpacity
@@ -475,7 +479,9 @@ const styles = StyleSheet.create({
   // Modal shared
   modalOuter: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%' },
+  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%', flexShrink: 1 },
+  presetsScroll: { flexShrink: 1 },
+  customSection: { paddingHorizontal: 24, paddingTop: 8, zIndex: 10 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 12 },
   sheetTitle: { fontSize: 20, fontWeight: '600', color: '#1C1C1E' },
   addedBadge: { fontSize: 14, fontWeight: '600', color: '#1D9E75' },
