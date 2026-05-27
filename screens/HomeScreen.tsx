@@ -34,8 +34,9 @@ export default function HomeScreen() {
 
   function handleAddPatient() {
     if (!initials.trim()) return;
-    addPatient(initials);
+    const id = addPatient(initials);
     setModalVisible(false);
+    navigation.navigate('Patient', { patientId: id });
   }
 
   return (

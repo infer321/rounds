@@ -18,8 +18,9 @@ Notifications.setNotificationHandler({
 
 type PatientsContextType = {
   patients: Patient[];
-  addPatient: (initials: string) => void;
+  addPatient: (initials: string) => string;
   addItem: (patientId: string, item: Omit<Item, 'id'>, durationStr?: string) => Promise<void>;
+  editItem: (patientId: string, itemId: string, label: string, durationStr?: string) => Promise<void>;
   markDone: (patientId: string, itemId: string) => void;
   toggleSignout: (patientId: string, itemId: string) => void;
   deletePatient: (patientId: string) => void;
@@ -55,14 +56,16 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(patients)).catch(() => {});
   }, [patients]);
 
-  function addPatient(initials: string) {
+  function addPatient(initials: string): string {
+    const id = Date.now().toString();
     const newPatient: Patient = {
-      id: Date.now().toString(),
+      id,
       initials: initials.trim().toUpperCase().slice(0, 3),
       colorIndex: patients.length % COLORS.length,
       items: [],
     };
     setPatients(prev => [...prev, newPatient]);
+    return id;
   }
 
   async function addItem(patientId: string, item: Omit<Item, 'id'>, durationStr?: string) {
@@ -110,6 +113,49 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  async function editItem(patientId: string, itemId: string, label: string, durationStr?: string) {
+    let endsAt: number | undefined;
+    let notificationId: string | undefined;
+
+    if (durationStr && durationStr !== '—') {
+      const ms = parseDurationMs(durationStr);
+      if (ms > 0) {
+        endsAt = Date.now() + ms;
+        const patient = patients.find(p => p.id === patientId);
+        // cancel old notification
+        const oldItem = patient?.items.find(i => i.id === itemId);
+        if (oldItem?.notificationId) {
+          Notifications.cancelScheduledNotificationAsync(oldItem.notificationId).catch(() => {});
+        }
+        try {
+          notificationId = await Notifications.scheduleNotificationAsync({
+            content: {
+              title: `⏰ ${label}`,
+              body: `Patient ${patient?.initials ?? ''} — timer expired`,
+              sound: true,
+            },
+            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(endsAt) },
+          });
+        } catch (_) {}
+      }
+    }
+
+    setPatients(prev =>
+      prev.map(p =>
+        p.id !== patientId ? p : {
+          ...p,
+          items: p.items.map(i =>
+            i.id !== itemId ? i : {
+              ...i,
+              label,
+              ...(endsAt !== undefined ? { endsAt, notificationId } : {}),
+            }
+          ),
+        }
+      )
+    );
+  }
+
   function toggleSignout(patientId: string, itemId: string) {
     setPatients(prev =>
       prev.map(p =>
@@ -145,7 +191,7 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <PatientsContext.Provider value={{ patients, addPatient, addItem, markDone, toggleSignout, deletePatient, clearAll }}>
+    <PatientsContext.Provider value={{ patients, addPatient, addItem, editItem, markDone, toggleSignout, deletePatient, clearAll }}>
       {children}
     </PatientsContext.Provider>
   );
