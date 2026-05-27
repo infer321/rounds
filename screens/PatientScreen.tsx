@@ -350,7 +350,7 @@ export default function PatientScreen() {
       <Modal visible={!!timeTarget} transparent animationType="slide">
         <KeyboardAvoidingView style={styles.modalOuter} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <Pressable style={styles.backdrop} onPress={() => setTimeTarget(null)} />
-          <View style={styles.sheet}>
+          <View style={styles.sheetSnug}>
             <View style={styles.sheetHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetTitle}>Change time</Text>
@@ -480,6 +480,7 @@ const styles = StyleSheet.create({
   modalOuter: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, flex: 1, maxHeight: '82%' },
+  sheetSnug: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   presetsScroll: { flex: 1, minHeight: 0 },
   customSection: { paddingHorizontal: 24, paddingTop: 4, flexShrink: 0, zIndex: 10 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 12, flexShrink: 0 },
