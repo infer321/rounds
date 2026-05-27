@@ -18,7 +18,8 @@ Notifications.setNotificationHandler({
 
 type PatientsContextType = {
   patients: Patient[];
-  addPatient: (initials: string) => string;
+  addPatient: (initials: string, age?: string, gender?: string, descriptor?: string) => string;
+  editPatient: (id: string, updates: { initials?: string; age?: string; gender?: string; descriptor?: string }) => void;
   addItem: (patientId: string, item: Omit<Item, 'id'>, durationStr?: string) => Promise<void>;
   editItem: (patientId: string, itemId: string, label: string, durationStr?: string) => Promise<void>;
   markDone: (patientId: string, itemId: string) => void;
@@ -56,16 +57,32 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(patients)).catch(() => {});
   }, [patients]);
 
-  function addPatient(initials: string): string {
+  function addPatient(initials: string, age?: string, gender?: string, descriptor?: string): string {
     const id = Date.now().toString();
     const newPatient: Patient = {
       id,
       initials: initials.trim().toUpperCase().slice(0, 3),
+      age: age?.trim() || undefined,
+      gender: gender || undefined,
+      descriptor: descriptor?.trim() || undefined,
       colorIndex: patients.length % COLORS.length,
       items: [],
     };
     setPatients(prev => [...prev, newPatient]);
     return id;
+  }
+
+  function editPatient(id: string, updates: { initials?: string; age?: string; gender?: string; descriptor?: string }) {
+    setPatients(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      return {
+        ...p,
+        ...(updates.initials !== undefined ? { initials: updates.initials.trim().toUpperCase().slice(0, 3) } : {}),
+        age: updates.age !== undefined ? (updates.age.trim() || undefined) : p.age,
+        gender: updates.gender !== undefined ? (updates.gender || undefined) : p.gender,
+        descriptor: updates.descriptor !== undefined ? (updates.descriptor.trim() || undefined) : p.descriptor,
+      };
+    }));
   }
 
   async function addItem(patientId: string, item: Omit<Item, 'id'>, durationStr?: string) {
@@ -191,7 +208,7 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <PatientsContext.Provider value={{ patients, addPatient, addItem, editItem, markDone, toggleSignout, deletePatient, clearAll }}>
+    <PatientsContext.Provider value={{ patients, addPatient, editPatient, addItem, editItem, markDone, toggleSignout, deletePatient, clearAll }}>
       {children}
     </PatientsContext.Provider>
   );

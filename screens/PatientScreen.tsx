@@ -36,7 +36,7 @@ function hmToDurationStr(h: number, m: number): string {
 export default function PatientScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
-  const { patients, addItem, editItem, markDone, toggleSignout } = usePatients();
+  const { patients, addItem, editItem, markDone, toggleSignout, editPatient } = usePatients();
   const { presets } = usePresets();
   const now = useNow();
   const patient = patients.find(p => p.id === route.params.patientId);
@@ -63,6 +63,39 @@ export default function PatientScreen() {
   const [timeTarget, setTimeTarget] = useState<Item | null>(null);
   const [timeH, setTimeH] = useState(0);
   const [timeM, setTimeM] = useState(0);
+
+  // Edit initials modal
+  const [editInitialsVisible, setEditInitialsVisible] = useState(false);
+  const [editInitialsVal, setEditInitialsVal] = useState('');
+
+  // Edit details modal (age + gender + descriptor)
+  const [editDetailsVisible, setEditDetailsVisible] = useState(false);
+  const [editDetailsAge, setEditDetailsAge] = useState('');
+  const [editDetailsGender, setEditDetailsGender] = useState('');
+  const [editDetailsDescriptor, setEditDetailsDescriptor] = useState('');
+
+  function openEditInitials() {
+    setEditInitialsVal(patient?.initials ?? '');
+    setEditInitialsVisible(true);
+  }
+
+  function saveInitials() {
+    if (!editInitialsVal.trim()) return;
+    editPatient(patient!.id, { initials: editInitialsVal });
+    setEditInitialsVisible(false);
+  }
+
+  function openEditDetails() {
+    setEditDetailsAge(patient?.age ?? '');
+    setEditDetailsGender(patient?.gender ?? '');
+    setEditDetailsDescriptor(patient?.descriptor ?? '');
+    setEditDetailsVisible(true);
+  }
+
+  function saveDetails() {
+    editPatient(patient!.id, { age: editDetailsAge, gender: editDetailsGender, descriptor: editDetailsDescriptor });
+    setEditDetailsVisible(false);
+  }
 
   if (!patient) return null;
 
@@ -156,12 +189,22 @@ export default function PatientScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backArrow}>←</Text>
         </TouchableOpacity>
-        <View style={[styles.avatar, { backgroundColor: COLORS[patient.colorIndex] }]}>
-          <Text style={[styles.avatarText, { color: TEXT_COLORS[patient.colorIndex] }]}>
-            {patient.initials}
-          </Text>
-        </View>
-        <Text style={styles.patientName}>Patient {patient.initials}</Text>
+        <TouchableOpacity onPress={openEditInitials} activeOpacity={0.7}>
+          <View style={[styles.avatar, { backgroundColor: COLORS[patient.colorIndex] }]}>
+            <Text style={[styles.avatarText, { color: TEXT_COLORS[patient.colorIndex] }]}>
+              {patient.initials}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.patientMeta} onPress={openEditDetails} activeOpacity={0.7}>
+          {(patient.age || patient.gender || patient.descriptor) ? (
+            <Text style={styles.patientName} numberOfLines={1}>
+              {[patient.age && patient.gender ? `${patient.age}${patient.gender}` : (patient.age || patient.gender), patient.descriptor].filter(Boolean).join(' ')}
+            </Text>
+          ) : (
+            <Text style={styles.patientNameEmpty}>Add age / details</Text>
+          )}
+        </TouchableOpacity>
         <TouchableOpacity style={styles.addItemBtn} onPress={openAdd}>
           <Text style={styles.addItemText}>+ Add</Text>
         </TouchableOpacity>
@@ -393,6 +436,103 @@ export default function PatientScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ── EDIT INITIALS MODAL ── */}
+      <Modal visible={editInitialsVisible} transparent animationType="fade">
+        <KeyboardAvoidingView style={styles.modalOuter} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <Pressable style={styles.backdrop} onPress={() => setEditInitialsVisible(false)} />
+          <View style={styles.sheetSnug}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Edit Initials</Text>
+              <TouchableOpacity onPress={() => setEditInitialsVisible(false)} hitSlop={10} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.sheetContent, { paddingBottom: 24 }]}>
+              <TextInput
+                style={[styles.input, { fontSize: 28, fontWeight: '700', letterSpacing: 6, textAlign: 'center' }]}
+                value={editInitialsVal}
+                onChangeText={setEditInitialsVal}
+                autoFocus
+                maxLength={3}
+                autoCapitalize="characters"
+                keyboardType="default"
+                returnKeyType="done"
+                onSubmitEditing={saveInitials}
+              />
+            </View>
+            <View style={styles.sheetFooter}>
+              <TouchableOpacity style={styles.addMoreBtn} onPress={() => setEditInitialsVisible(false)}>
+                <Text style={styles.addMoreText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, !editInitialsVal.trim() && styles.btnDisabled]}
+                onPress={saveInitials}
+                disabled={!editInitialsVal.trim()}
+              >
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── EDIT DETAILS MODAL ── */}
+      <Modal visible={editDetailsVisible} transparent animationType="fade">
+        <KeyboardAvoidingView style={styles.modalOuter} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <Pressable style={styles.backdrop} onPress={() => setEditDetailsVisible(false)} />
+          <View style={styles.sheetSnug}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Edit Details</Text>
+              <TouchableOpacity onPress={() => setEditDetailsVisible(false)} hitSlop={10} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.sheetContent, { paddingBottom: 24 }]}>
+              <View style={styles.ageGenderRow}>
+                <TextInput
+                  style={styles.ageInput}
+                  placeholder="Age"
+                  placeholderTextColor="#BBB"
+                  value={editDetailsAge}
+                  onChangeText={setEditDetailsAge}
+                  keyboardType="default"
+                  maxLength={3}
+                  autoFocus
+                  returnKeyType="next"
+                />
+                {['M', 'F', 'X'].map(g => (
+                  <TouchableOpacity
+                    key={g}
+                    style={[styles.genderPill, editDetailsGender === g && styles.genderPillActive]}
+                    onPress={() => setEditDetailsGender(editDetailsGender === g ? '' : g)}
+                  >
+                    <Text style={[styles.genderPillText, editDetailsGender === g && styles.genderPillTextActive]}>{g}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. esophageal mass"
+                placeholderTextColor="#BBB"
+                value={editDetailsDescriptor}
+                onChangeText={setEditDetailsDescriptor}
+                keyboardType="default"
+                returnKeyType="done"
+                onSubmitEditing={saveDetails}
+              />
+            </View>
+            <View style={styles.sheetFooter}>
+              <TouchableOpacity style={styles.addMoreBtn} onPress={() => setEditDetailsVisible(false)}>
+                <Text style={styles.addMoreText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={saveDetails}>
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ── EDIT MODAL ── */}
       <Modal visible={!!editTarget} transparent animationType="slide">
         <KeyboardAvoidingView style={styles.modalOuter} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -454,7 +594,15 @@ const styles = StyleSheet.create({
   backArrow: { fontSize: 18, color: '#1C1C1E' },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 13, fontWeight: '600' },
-  patientName: { flex: 1, fontSize: 20, fontWeight: '600', color: '#1C1C1E' },
+  patientMeta: { flex: 1 },
+  patientName: { fontSize: 17, fontWeight: '600', color: '#1C1C1E' },
+  patientNameEmpty: { fontSize: 14, color: '#BBB', fontStyle: 'italic' },
+  ageGenderRow: { flexDirection: 'row', gap: 8, marginBottom: 12, alignItems: 'center' },
+  ageInput: { backgroundColor: '#F5F5F7', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontWeight: '500', color: '#1C1C1E', width: 72, textAlign: 'center' },
+  genderPill: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#F5F5F7', alignItems: 'center' },
+  genderPillActive: { backgroundColor: '#1C1C1E' },
+  genderPillText: { fontSize: 15, fontWeight: '600', color: '#999' },
+  genderPillTextActive: { color: '#fff' },
   addItemBtn: { backgroundColor: '#1C1C1E', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
   addItemText: { color: '#fff', fontSize: 13, fontWeight: '500' },
   statsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 16, flexWrap: 'wrap' },

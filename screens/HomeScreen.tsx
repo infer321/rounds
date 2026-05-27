@@ -22,6 +22,9 @@ export default function HomeScreen() {
   const now = useNow();
   const [modalVisible, setModalVisible] = useState(false);
   const [initials, setInitials] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
+  const [descriptor, setDescriptor] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; initials: string } | null>(null);
 
   const slots: (Patient | null)[] = [...patients];
@@ -29,12 +32,15 @@ export default function HomeScreen() {
 
   function openAddModal() {
     setInitials('');
+    setAge('');
+    setGender('');
+    setDescriptor('');
     setModalVisible(true);
   }
 
   function handleAddPatient() {
     if (!initials.trim()) return;
-    const id = addPatient(initials);
+    const id = addPatient(initials, age, gender, descriptor);
     setModalVisible(false);
     navigation.navigate('Patient', { patientId: id });
   }
@@ -67,7 +73,14 @@ export default function HomeScreen() {
                     {patient.initials}
                   </Text>
                 </View>
-                <Text style={styles.itemCount}>{patient.items.length} items</Text>
+                <View style={{ flex: 1 }}>
+                  {(patient.age || patient.gender || patient.descriptor) ? (
+                    <Text style={styles.cardDemo} numberOfLines={1}>
+                      {[patient.age && patient.gender ? `${patient.age}${patient.gender}` : (patient.age || patient.gender), patient.descriptor].filter(Boolean).join(' ')}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.itemCount}>{patient.items.length} item{patient.items.length !== 1 ? 's' : ''}</Text>
+                </View>
               </View>
               {sortItemsByUrgency(patient.items, now).slice(0, 3).map(item => {
                 const cd = item.endsAt ? formatCountdown(item.endsAt, now) : null;
@@ -146,38 +159,74 @@ export default function HomeScreen() {
 
       {/* Add Patient Modal */}
       <Modal visible={modalVisible} transparent animationType="fade">
-        <Pressable style={styles.backdrop} onPress={() => setModalVisible(false)}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <Pressable style={styles.sheet}>
-              <Text style={styles.sheetTitle}>New Patient</Text>
-              <Text style={styles.sheetSubtitle}>Enter initials (2–3 letters)</Text>
+        <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Pressable style={{ flex: 1 }} onPress={() => setModalVisible(false)} />
+          <Pressable style={styles.sheet}>
+            <Text style={styles.sheetTitle}>New Patient</Text>
+
+            {/* Initials */}
+            <TextInput
+              style={styles.initialsInput}
+              placeholder="Initials"
+              placeholderTextColor="#BBB"
+              value={initials}
+              onChangeText={setInitials}
+              autoFocus
+              maxLength={3}
+              autoCapitalize="characters"
+              keyboardType="default"
+              returnKeyType="next"
+            />
+
+            {/* Age + Gender row */}
+            <View style={styles.ageGenderRow}>
               <TextInput
-                style={styles.input}
-                placeholder="e.g. JM"
+                style={styles.ageInput}
+                placeholder="Age"
                 placeholderTextColor="#BBB"
-                value={initials}
-                onChangeText={setInitials}
-                autoFocus
+                value={age}
+                onChangeText={setAge}
+                keyboardType="default"
                 maxLength={3}
-                autoCapitalize="characters"
-                returnKeyType="done"
-                onSubmitEditing={handleAddPatient}
+                returnKeyType="next"
               />
-              <View style={styles.sheetButtons}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
+              {['M', 'F', 'X'].map(g => (
                 <TouchableOpacity
-                  style={[styles.confirmBtn, !initials.trim() && styles.confirmBtnDisabled]}
-                  onPress={handleAddPatient}
-                  disabled={!initials.trim()}
+                  key={g}
+                  style={[styles.genderPill, gender === g && styles.genderPillActive]}
+                  onPress={() => setGender(gender === g ? '' : g)}
                 >
-                  <Text style={styles.confirmText}>Add Patient</Text>
+                  <Text style={[styles.genderPillText, gender === g && styles.genderPillTextActive]}>{g}</Text>
                 </TouchableOpacity>
-              </View>
-            </Pressable>
-          </KeyboardAvoidingView>
-        </Pressable>
+              ))}
+            </View>
+
+            {/* Descriptor */}
+            <TextInput
+              style={styles.descriptorInput}
+              placeholder="e.g. esophageal mass"
+              placeholderTextColor="#BBB"
+              value={descriptor}
+              onChangeText={setDescriptor}
+              keyboardType="default"
+              returnKeyType="done"
+              onSubmitEditing={handleAddPatient}
+            />
+
+            <View style={styles.sheetButtons}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, !initials.trim() && styles.confirmBtnDisabled]}
+                onPress={handleAddPatient}
+                disabled={!initials.trim()}
+              >
+                <Text style={styles.confirmText}>Add Patient</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -214,12 +263,19 @@ const styles = StyleSheet.create({
   navIcon: { fontSize: 18, color: '#555' },
   navLabel: { fontSize: 10, color: '#999' },
   navActive: { color: '#1C1C1E', fontWeight: '600' },
+  cardDemo: { fontSize: 11, fontWeight: '500', color: '#555', marginBottom: 1 },
   // Modal
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: 40 },
-  sheetTitle: { fontSize: 20, fontWeight: '600', color: '#1C1C1E', marginBottom: 4 },
-  sheetSubtitle: { fontSize: 13, color: '#999', marginBottom: 20 },
-  input: { backgroundColor: '#F5F5F7', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 24, fontWeight: '600', letterSpacing: 4, color: '#1C1C1E', textAlign: 'center', marginBottom: 20 },
+  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  sheetTitle: { fontSize: 20, fontWeight: '600', color: '#1C1C1E', marginBottom: 16 },
+  initialsInput: { backgroundColor: '#F5F5F7', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 28, fontWeight: '700', letterSpacing: 6, color: '#1C1C1E', textAlign: 'center', marginBottom: 12 },
+  ageGenderRow: { flexDirection: 'row', gap: 8, marginBottom: 12, alignItems: 'center' },
+  ageInput: { backgroundColor: '#F5F5F7', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontWeight: '500', color: '#1C1C1E', width: 72, textAlign: 'center' },
+  genderPill: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#F5F5F7', alignItems: 'center' },
+  genderPillActive: { backgroundColor: '#1C1C1E' },
+  genderPillText: { fontSize: 15, fontWeight: '600', color: '#999' },
+  genderPillTextActive: { color: '#fff' },
+  descriptorInput: { backgroundColor: '#F5F5F7', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#1C1C1E', marginBottom: 20 },
   sheetButtons: { flexDirection: 'row', gap: 10 },
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 0.5, borderColor: '#DDD', alignItems: 'center' },
   cancelText: { fontSize: 15, color: '#555', fontWeight: '500' },

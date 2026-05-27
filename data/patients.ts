@@ -13,6 +13,9 @@ export type Item = {
 export type Patient = {
   id: string;
   initials: string;
+  age?: string;
+  gender?: string;       // 'M' | 'F' | 'X'
+  descriptor?: string;
   colorIndex: number;
   items: Item[];
 };
