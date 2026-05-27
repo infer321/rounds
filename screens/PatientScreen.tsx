@@ -41,6 +41,7 @@ export default function PatientScreen() {
   const now = useNow();
   const patient = patients.find(p => p.id === route.params.patientId);
   const labelRef = useRef<TextInput>(null);
+  const addScrollRef = useRef<ScrollView>(null);
 
   // Add modal state
   const [addVisible, setAddVisible] = useState(false);
@@ -250,13 +251,13 @@ export default function PatientScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Type pills + preset grid — scrollable, shrinks when keyboard appears */}
             <ScrollView
+              ref={addScrollRef}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.sheetContent}
-              style={styles.presetsScroll}
             >
+              {/* Type pills */}
               <View style={styles.typePills}>
                 {(['timer', 'task'] as ItemType[]).map(type => (
                   <TouchableOpacity
@@ -271,6 +272,7 @@ export default function PatientScreen() {
                 ))}
               </View>
 
+              {/* Preset grid */}
               {selectedType === 'timer' && (
                 <>
                   <View style={styles.presetGrid}>
@@ -288,10 +290,8 @@ export default function PatientScreen() {
                   </View>
                 </>
               )}
-            </ScrollView>
 
-            {/* Fixed bottom: label → picker → signout — always visible above keyboard */}
-            <View style={styles.customSection}>
+              {/* Custom label + autocomplete */}
               <View style={styles.inputWrapper}>
                 <TextInput
                   ref={labelRef}
@@ -300,7 +300,10 @@ export default function PatientScreen() {
                   placeholderTextColor="#BBB"
                   value={customLabel}
                   onChangeText={t => { setCustomLabel(t); setShowSuggestions(true); }}
-                  onFocus={() => setShowSuggestions(true)}
+                  onFocus={() => {
+                    setShowSuggestions(true);
+                    setTimeout(() => addScrollRef.current?.scrollToEnd({ animated: true }), 350);
+                  }}
                   returnKeyType="done"
                   onSubmitEditing={canAddCustom ? addCustom : undefined}
                 />
@@ -316,6 +319,7 @@ export default function PatientScreen() {
                 )}
               </View>
 
+              {/* Duration picker */}
               {selectedType === 'timer' && (
                 <DurationPicker
                   hours={pickerH}
@@ -325,13 +329,14 @@ export default function PatientScreen() {
                 />
               )}
 
+              {/* Signout toggle */}
               <TouchableOpacity style={styles.signoutToggleRow} onPress={() => setFlagSignout(v => !v)}>
                 <View style={[styles.signoutToggleBox, flagSignout && styles.signoutToggleBoxChecked]}>
                   {flagSignout && <Text style={styles.signoutToggleCheck}>✓</Text>}
                 </View>
                 <Text style={styles.signoutToggleLabel}>Flag for signout</Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
 
             <View style={styles.sheetFooter}>
               <TouchableOpacity
@@ -479,17 +484,15 @@ const styles = StyleSheet.create({
   // Modal shared
   modalOuter: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, flex: 1, maxHeight: '82%' },
+  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%' },
   sheetSnug: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  presetsScroll: { flex: 1, minHeight: 0 },
-  customSection: { paddingHorizontal: 24, paddingTop: 4, flexShrink: 0, zIndex: 10 },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 12, flexShrink: 0 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 12 },
   sheetTitle: { fontSize: 20, fontWeight: '600', color: '#1C1C1E' },
   addedBadge: { fontSize: 14, fontWeight: '600', color: '#1D9E75' },
   closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' },
   closeBtnText: { fontSize: 14, color: '#fff', fontWeight: '600' },
   sheetContent: { paddingHorizontal: 24, paddingBottom: 12 },
-  sheetFooter: { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 32, borderTopWidth: 0.5, borderTopColor: '#F0F0F0', backgroundColor: '#fff', flexShrink: 0 },
+  sheetFooter: { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 32, borderTopWidth: 0.5, borderTopColor: '#F0F0F0', backgroundColor: '#fff' },
   typePills: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   typePill: { flex: 1, paddingVertical: 9, borderRadius: 12, backgroundColor: '#F0F0F0', alignItems: 'center' },
   typePillActive: { backgroundColor: '#1C1C1E' },
