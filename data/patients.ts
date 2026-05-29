@@ -21,6 +21,7 @@ export type HAndP = {
   labs?: Labs;
   diagnostics?: string;
   ap?: string;
+  subjective?: string;   // SOAP S section
 };
 
 export type Item = {

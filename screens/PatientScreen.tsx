@@ -13,6 +13,7 @@ import { formatCountdown, sortItemsByUrgency } from '../utils/time';
 import { usePresets } from '../hooks/usePresets';
 import DurationPicker from '../components/DurationPicker';
 import HAndPSection from '../components/HAndPSection';
+import SOAPSection from '../components/SOAPSection';
 
 type RouteProps = RouteProp<RootStackParamList, 'Patient'>;
 
@@ -44,7 +45,7 @@ export default function PatientScreen() {
   const labelRef = useRef<TextInput>(null);
   const addScrollRef = useRef<ScrollView>(null);
 
-  const [activeTab, setActiveTab] = useState<'timers' | 'hp'>('timers');
+  const [activeTab, setActiveTab] = useState<'timers' | 'hp' | 'soap'>('timers');
 
   // Add modal state
   const [addVisible, setAddVisible] = useState(false);
@@ -215,18 +216,15 @@ export default function PatientScreen() {
 
       {/* ── Tab bar ── */}
       <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'timers' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('timers')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'timers' && styles.tabBtnTextActive]}>Timers</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'hp' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('hp')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'hp' && styles.tabBtnTextActive]}>H&amp;P</Text>
-        </TouchableOpacity>
+        {([['timers','Timers'],['hp','H&P'],['soap','SOAP']] as const).map(([key, label]) => (
+          <TouchableOpacity
+            key={key}
+            style={[styles.tabBtn, activeTab === key && styles.tabBtnActive]}
+            onPress={() => setActiveTab(key)}
+          >
+            <Text style={[styles.tabBtnText, activeTab === key && styles.tabBtnTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* ── Timers tab ── */}
@@ -306,6 +304,15 @@ export default function PatientScreen() {
       {/* ── H&P tab ── */}
       {activeTab === 'hp' && (
         <HAndPSection
+          key={patient.id}
+          hp={patient.hp ?? {}}
+          onUpdate={newHp => updateHP(patient.id, newHp)}
+        />
+      )}
+
+      {/* ── SOAP tab ── */}
+      {activeTab === 'soap' && (
+        <SOAPSection
           key={patient.id}
           hp={patient.hp ?? {}}
           onUpdate={newHp => updateHP(patient.id, newHp)}
