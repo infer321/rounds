@@ -1,5 +1,28 @@
 export type ItemType = 'timer' | 'task';
 
+export type Vitals = {
+  temp?: string; rr?: string; hr?: string;
+  bpS?: string; bpD?: string;
+  o2Mode?: 'RA' | 'NC' | 'BiPAP';
+  o2Val?: string;
+};
+
+export type Labs = {
+  wbc?: string; hgb?: string; plt?: string;
+  na?: string; k?: string; cl?: string; co2?: string;
+  bun?: string; cr?: string; glu?: string;
+};
+
+export type HAndP = {
+  hpi?: string;
+  course?: string;
+  vitals?: Vitals;
+  pe?: string;
+  labs?: Labs;
+  diagnostics?: string;
+  ap?: string;
+};
+
 export type Item = {
   id: string;
   type: ItemType;
@@ -14,10 +37,11 @@ export type Patient = {
   id: string;
   initials: string;
   age?: string;
-  gender?: string;       // 'M' | 'F' | 'X'
+  gender?: string;
   descriptor?: string;
   colorIndex: number;
   items: Item[];
+  hp?: HAndP;
 };
 
 export const COLORS = ['#E1F5EE', '#EEEDFE', '#FAEEDA', '#FCEBEB', '#E6F1FB', '#F0F0F0'];

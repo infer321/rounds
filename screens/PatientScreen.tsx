@@ -12,6 +12,7 @@ import { useNow } from '../hooks/useNow';
 import { formatCountdown, sortItemsByUrgency } from '../utils/time';
 import { usePresets } from '../hooks/usePresets';
 import DurationPicker from '../components/DurationPicker';
+import HAndPSection from '../components/HAndPSection';
 
 type RouteProps = RouteProp<RootStackParamList, 'Patient'>;
 
@@ -36,12 +37,14 @@ function hmToDurationStr(h: number, m: number): string {
 export default function PatientScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
-  const { patients, addItem, editItem, markDone, toggleSignout, editPatient } = usePatients();
+  const { patients, addItem, editItem, markDone, toggleSignout, editPatient, updateHP } = usePatients();
   const { presets } = usePresets();
   const now = useNow();
   const patient = patients.find(p => p.id === route.params.patientId);
   const labelRef = useRef<TextInput>(null);
   const addScrollRef = useRef<ScrollView>(null);
+
+  const [activeTab, setActiveTab] = useState<'timers' | 'hp'>('timers');
 
   // Add modal state
   const [addVisible, setAddVisible] = useState(false);
@@ -210,74 +213,104 @@ export default function PatientScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.statsRow}>
-        {(['timer', 'task'] as ItemType[]).map(type => {
-          const count = patient.items.filter(i => i.type === type).length;
-          return (
-            <View key={type} style={[styles.statChip, { backgroundColor: TYPE_BG[type] }]}>
-              <View style={[styles.statDot, { backgroundColor: DOT_COLORS[type] }]} />
-              <Text style={[styles.statText, { color: TYPE_TEXT[type] }]}>
-                {count} {TYPE_LABELS[type]}{count !== 1 ? 's' : ''}
-              </Text>
-            </View>
-          );
-        })}
-        {signoutCount > 0 && (
-          <View style={[styles.statChip, { backgroundColor: '#FAEEDA' }]}>
-            <View style={[styles.statDot, { backgroundColor: '#BA7517' }]} />
-            <Text style={[styles.statText, { color: '#633806' }]}>{signoutCount} signout</Text>
-          </View>
-        )}
+      {/* ── Tab bar ── */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'timers' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('timers')}
+        >
+          <Text style={[styles.tabBtnText, activeTab === 'timers' && styles.tabBtnTextActive]}>Timers</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'hp' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('hp')}
+        >
+          <Text style={[styles.tabBtnText, activeTab === 'hp' && styles.tabBtnTextActive]}>H&amp;P</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {patient.items.length === 0 && (
-          <TouchableOpacity style={styles.emptyState} onPress={openAdd}>
-            <Text style={styles.emptyStateText}>+ Add a timer or task</Text>
-          </TouchableOpacity>
-        )}
-        {sorted.map(item => {
-          const cd = item.endsAt ? formatCountdown(item.endsAt, now) : null;
-          const isUrgent = cd ? cd.isUrgent : !!item.urgent;
-          return (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.itemCard, isUrgent && styles.urgentCard]}
-              onLongPress={() => openEdit(item)}
-              delayLongPress={400}
-              activeOpacity={0.85}
-            >
-              <View style={styles.itemLeft}>
-                <View style={[styles.typeBadge, { backgroundColor: TYPE_BG[item.type] }]}>
-                  <Text style={[styles.typeBadgeText, { color: TYPE_TEXT[item.type] }]}>
-                    {TYPE_LABELS[item.type]}
+      {/* ── Timers tab ── */}
+      {activeTab === 'timers' && (
+        <>
+          <View style={styles.statsRow}>
+            {(['timer', 'task'] as ItemType[]).map(type => {
+              const count = patient.items.filter(i => i.type === type).length;
+              return (
+                <View key={type} style={[styles.statChip, { backgroundColor: TYPE_BG[type] }]}>
+                  <View style={[styles.statDot, { backgroundColor: DOT_COLORS[type] }]} />
+                  <Text style={[styles.statText, { color: TYPE_TEXT[type] }]}>
+                    {count} {TYPE_LABELS[type]}{count !== 1 ? 's' : ''}
                   </Text>
                 </View>
-                <Text style={[styles.itemLabel, isUrgent && styles.urgentLabel]}>{item.label}</Text>
+              );
+            })}
+            {signoutCount > 0 && (
+              <View style={[styles.statChip, { backgroundColor: '#FAEEDA' }]}>
+                <View style={[styles.statDot, { backgroundColor: '#BA7517' }]} />
+                <Text style={[styles.statText, { color: '#633806' }]}>{signoutCount} signout</Text>
               </View>
-              <View style={styles.itemRight}>
-                {cd && (
-                  <TouchableOpacity onPress={() => openTimeEdit(item)} hitSlop={8}>
-                    <Text style={[styles.timeLeft, isUrgent && styles.urgentTime, styles.timeLeftTappable]}>
-                      {cd.display}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+            )}
+          </View>
+
+          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            {patient.items.length === 0 && (
+              <TouchableOpacity style={styles.emptyState} onPress={openAdd}>
+                <Text style={styles.emptyStateText}>+ Add a timer or task</Text>
+              </TouchableOpacity>
+            )}
+            {sorted.map(item => {
+              const cd = item.endsAt ? formatCountdown(item.endsAt, now) : null;
+              const isUrgent = cd ? cd.isUrgent : !!item.urgent;
+              return (
                 <TouchableOpacity
-                  style={[styles.signoutBox, item.signout && styles.signoutBoxChecked]}
-                  onPress={() => toggleSignout(patient.id, item.id)}
-                  hitSlop={8}
+                  key={item.id}
+                  style={[styles.itemCard, isUrgent && styles.urgentCard]}
+                  onLongPress={() => openEdit(item)}
+                  delayLongPress={400}
+                  activeOpacity={0.85}
                 >
-                  {item.signout && <Text style={styles.signoutCheck}>✓</Text>}
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.typeBadge, { backgroundColor: TYPE_BG[item.type] }]}>
+                      <Text style={[styles.typeBadgeText, { color: TYPE_TEXT[item.type] }]}>
+                        {TYPE_LABELS[item.type]}
+                      </Text>
+                    </View>
+                    <Text style={[styles.itemLabel, isUrgent && styles.urgentLabel]}>{item.label}</Text>
+                  </View>
+                  <View style={styles.itemRight}>
+                    {cd && (
+                      <TouchableOpacity onPress={() => openTimeEdit(item)} hitSlop={8}>
+                        <Text style={[styles.timeLeft, isUrgent && styles.urgentTime, styles.timeLeftTappable]}>
+                          {cd.display}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.signoutBox, item.signout && styles.signoutBoxChecked]}
+                      onPress={() => toggleSignout(patient.id, item.id)}
+                      hitSlop={8}
+                    >
+                      {item.signout && <Text style={styles.signoutCheck}>✓</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.doneBtn} onPress={() => markDone(patient.id, item.id)}>
+                      <Text style={styles.doneBtnText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.doneBtn} onPress={() => markDone(patient.id, item.id)}>
-                  <Text style={styles.doneBtnText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+              );
+            })}
+          </ScrollView>
+        </>
+      )}
+
+      {/* ── H&P tab ── */}
+      {activeTab === 'hp' && (
+        <HAndPSection
+          key={patient.id}
+          hp={patient.hp ?? {}}
+          onUpdate={newHp => updateHP(patient.id, newHp)}
+        />
+      )}
 
       {/* ── ADD ITEMS MODAL ── */}
       <Modal visible={addVisible} transparent animationType="slide">
@@ -605,6 +638,11 @@ const styles = StyleSheet.create({
   genderPillTextActive: { color: '#fff' },
   addItemBtn: { backgroundColor: '#1C1C1E', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
   addItemText: { color: '#fff', fontSize: 13, fontWeight: '500' },
+  tabBar: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, backgroundColor: '#F0F0F0', borderRadius: 12, padding: 3, gap: 3 },
+  tabBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
+  tabBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+  tabBtnText: { fontSize: 14, fontWeight: '500', color: '#999' },
+  tabBtnTextActive: { color: '#1C1C1E', fontWeight: '600' },
   statsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 16, flexWrap: 'wrap' },
   statChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   statDot: { width: 5, height: 5, borderRadius: 3 },

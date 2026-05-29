@@ -73,14 +73,12 @@ export default function HomeScreen() {
                     {patient.initials}
                   </Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  {(patient.age || patient.gender || patient.descriptor) ? (
-                    <Text style={styles.cardDemo} numberOfLines={1}>
-                      {[patient.age && patient.gender ? `${patient.age}${patient.gender}` : (patient.age || patient.gender), patient.descriptor].filter(Boolean).join(' ')}
-                    </Text>
-                  ) : null}
-                  <Text style={styles.itemCount}>{patient.items.length} item{patient.items.length !== 1 ? 's' : ''}</Text>
-                </View>
+                {(patient.age || patient.gender || patient.descriptor) ? (
+                  <Text style={styles.cardDemo} numberOfLines={1}>
+                    {[patient.age && patient.gender ? `${patient.age}${patient.gender}` : (patient.age || patient.gender), patient.descriptor].filter(Boolean).join(' ')}
+                  </Text>
+                ) : null}
+                <Text style={styles.itemCount}>{patient.items.length} item{patient.items.length !== 1 ? 's' : ''}</Text>
               </View>
               {sortItemsByUrgency(patient.items, now).slice(0, 3).map(item => {
                 const cd = item.endsAt ? formatCountdown(item.endsAt, now) : null;
@@ -241,10 +239,10 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 10, paddingBottom: 16 },
   card: { width: '47%', backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 0.5, borderColor: '#E5E5EA', minHeight: 130 },
   urgentCard: { borderColor: '#E24B4A', borderWidth: 1 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  cardHeader: { alignItems: 'center', marginBottom: 10 },
   avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 11, fontWeight: '600' },
-  itemCount: { fontSize: 10, color: '#999' },
+  itemCount: { fontSize: 10, fontWeight: '600', color: '#999', marginTop: 1 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 },
   dot: { width: 5, height: 5, borderRadius: 3, flexShrink: 0 },
   itemLabel: { fontSize: 11, color: '#555', flex: 1 },
@@ -263,7 +261,7 @@ const styles = StyleSheet.create({
   navIcon: { fontSize: 18, color: '#555' },
   navLabel: { fontSize: 10, color: '#999' },
   navActive: { color: '#1C1C1E', fontWeight: '600' },
-  cardDemo: { fontSize: 11, fontWeight: '500', color: '#555', marginBottom: 1 },
+  cardDemo: { fontSize: 11, fontWeight: '700', color: '#1C1C1E', marginTop: 4, textAlign: 'center' },
   // Modal
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },

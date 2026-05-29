@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Patient, Item, SAMPLE_PATIENTS, COLORS } from '../data/patients';
+import { Patient, Item, HAndP, SAMPLE_PATIENTS, COLORS } from '../data/patients';
 import { parseDurationMs } from '../utils/time';
 
 const STORAGE_KEY = '@rounds_patients';
@@ -24,6 +24,7 @@ type PatientsContextType = {
   editItem: (patientId: string, itemId: string, label: string, durationStr?: string) => Promise<void>;
   markDone: (patientId: string, itemId: string) => void;
   toggleSignout: (patientId: string, itemId: string) => void;
+  updateHP: (patientId: string, hp: HAndP) => void;
   deletePatient: (patientId: string) => void;
   clearAll: () => void;
 };
@@ -184,6 +185,10 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  function updateHP(patientId: string, hp: HAndP) {
+    setPatients(prev => prev.map(p => p.id === patientId ? { ...p, hp } : p));
+  }
+
   function cancelAllNotifications(p: Patient) {
     p.items.forEach(item => {
       if (item.notificationId) {
@@ -208,7 +213,7 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <PatientsContext.Provider value={{ patients, addPatient, editPatient, addItem, editItem, markDone, toggleSignout, deletePatient, clearAll }}>
+    <PatientsContext.Provider value={{ patients, addPatient, editPatient, updateHP, addItem, editItem, markDone, toggleSignout, deletePatient, clearAll }}>
       {children}
     </PatientsContext.Provider>
   );
