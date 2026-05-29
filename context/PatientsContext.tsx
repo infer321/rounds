@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Patient, Item, HAndP, SAMPLE_PATIENTS, COLORS } from '../data/patients';
 import { parseDurationMs } from '../utils/time';
+import { encryptData, decryptData } from '../utils/encryption';
 
 const STORAGE_KEY = '@rounds_patients';
 
@@ -35,14 +36,21 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const loaded = useRef(false);
 
-  // Load from storage on mount
+  // Load from storage on mount (decrypt if encrypted, fall back gracefully)
   useEffect(() => {
     Notifications.requestPermissionsAsync();
-    AsyncStorage.getItem(STORAGE_KEY).then(raw => {
+    AsyncStorage.getItem(STORAGE_KEY).then(async raw => {
       loaded.current = true;
       if (raw) {
         try {
-          setPatients(JSON.parse(raw));
+          // Attempt decryption first (new format)
+          const decrypted = await decryptData(raw);
+          if (decrypted) {
+            setPatients(JSON.parse(decrypted));
+          } else {
+            // Legacy: unencrypted JSON (first launch after adding encryption)
+            setPatients(JSON.parse(raw));
+          }
         } catch {
           setPatients(SAMPLE_PATIENTS);
         }
@@ -52,10 +60,12 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Persist on every change (skip the initial empty state before load)
+  // Persist on every change — encrypt before writing
   useEffect(() => {
     if (!loaded.current) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(patients)).catch(() => {});
+    encryptData(JSON.stringify(patients))
+      .then(cipher => AsyncStorage.setItem(STORAGE_KEY, cipher))
+      .catch(() => {});
   }, [patients]);
 
   function addPatient(initials: string, age?: string, gender?: string, descriptor?: string): string {
