@@ -8,7 +8,7 @@ export type Vitals = {
 };
 
 export type Labs = {
-  wbc?: string; hgb?: string; plt?: string;
+  wbc?: string; hgb?: string; hct?: string; plt?: string;
   na?: string; k?: string; cl?: string; co2?: string;
   bun?: string; cr?: string; glu?: string;
 };

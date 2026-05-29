@@ -1,43 +1,15 @@
 import { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { HAndP, Labs, Vitals } from '../data/patients';
+import { CBCFishbone, BMPFishbone } from './LabFishbone';
 
 const BORDER = '#D8D8D8';
 const BG = '#fff';
 
 // Tab-order for auto-advance: CBC first, then BMP left-to-right top-to-bottom
-const LAB_ORDER: (keyof Labs)[] = ['wbc', 'hgb', 'plt', 'na', 'k', 'cl', 'co2', 'bun', 'cr', 'glu'];
+const LAB_ORDER: (keyof Labs)[] = ['wbc', 'hgb', 'hct', 'plt', 'na', 'k', 'cl', 'co2', 'bun', 'cr', 'glu'];
 
 type Props = { hp: HAndP; onUpdate: (hp: HAndP) => void };
-
-// ─── Fish cell ────────────────────────────────────────────────
-function FishCell({
-  label, value, onChange, inputRef, onNext, isLast,
-}: {
-  label: string; value: string;
-  onChange: (v: string) => void;
-  inputRef: (r: TextInput | null) => void;
-  onNext: () => void; isLast: boolean;
-}) {
-  return (
-    <View style={f.cell}>
-      <Text style={f.cellLabel}>{label}</Text>
-      <TextInput
-        ref={inputRef}
-        style={f.cellInput}
-        value={value}
-        onChangeText={onChange}
-        keyboardType="decimal-pad"
-        returnKeyType={isLast ? 'done' : 'next'}
-        onSubmitEditing={isLast ? undefined : onNext}
-        placeholder="—"
-        placeholderTextColor="#CCC"
-        textAlign="center"
-        selectTextOnFocus
-      />
-    </View>
-  );
-}
 
 // ─── Vital cell ───────────────────────────────────────────────
 function VitCell({ label, value, onChange }: {
@@ -78,18 +50,6 @@ export default function HAndPSection({ hp, onUpdate }: Props) {
 
   const vit = local.vitals ?? {};
   const labs = local.labs ?? {};
-
-  // Shorthand for a lab cell render
-  const lc = (key: keyof Labs, label: string) => (
-    <FishCell
-      label={label}
-      value={labs[key] ?? ''}
-      onChange={v => pL(key, v)}
-      inputRef={r => { labRefs.current[key] = r; }}
-      onNext={() => advance(key)}
-      isLast={key === 'glu'}
-    />
-  );
 
   return (
     <ScrollView
@@ -156,60 +116,13 @@ export default function HAndPSection({ hp, onUpdate }: Props) {
       {/* ── Labs ────────────────────────── */}
       <Text style={s.secTitle}>Labs</Text>
 
-      {/* CBC fishbone
-          ┌──────────┬──────────┐
-          │          │   Hgb    │
-          │   WBC    ├──────────┤
-          │          │   Plt    │
-          └──────────┴──────────┘  */}
+      {/* CBC fishbone — WBC ><>< Plts with Hgb/HCT on bar */}
       <Text style={s.fishTitle}>CBC</Text>
-      <View style={f.cbcBox}>
-        {/* Left: WBC */}
-        <View style={f.cbcLeft}>
-          {lc('wbc', 'WBC')}
-        </View>
-        {/* Vertical divider */}
-        <View style={f.vDiv} />
-        {/* Right: Hgb / Plt */}
-        <View style={f.cbcRight}>
-          {lc('hgb', 'Hgb')}
-          <View style={f.hDiv} />
-          {lc('plt', 'Plt')}
-        </View>
-      </View>
+      <CBCFishbone labs={labs} labRefs={labRefs} patchLab={pL} advance={advance} />
 
-      {/* BMP fishbone
-          ┌──────┬──────┬──────┐
-          │  Na  │  Cl  │ BUN  │░░░░░  ← top-right empty
-          ├──────┼──────┼──────┼──────┐
-          │  K   │  CO₂ │  Cr  │  Glu │
-          └──────┴──────┴──────┴──────┘ */}
-      <Text style={[s.fishTitle, { marginTop: 14 }]}>BMP</Text>
-      <View style={f.bmpBox}>
-        {/* Row 1: Na | Cl | BUN | [empty] – 4 equal columns */}
-        <View style={f.bmpRow}>
-          <View style={{ flex: 1 }}>{lc('na', 'Na')}</View>
-          <View style={f.vDiv} />
-          <View style={{ flex: 1 }}>{lc('cl', 'Cl')}</View>
-          <View style={f.vDiv} />
-          <View style={{ flex: 1 }}>{lc('bun', 'BUN')}</View>
-          <View style={f.vDiv} />
-          {/* empty top-right corner */}
-          <View style={[{ flex: 1 }, f.emptyCorner]} />
-        </View>
-        {/* Horizontal divider */}
-        <View style={f.hDiv} />
-        {/* Row 2: K | CO₂ | Cr | Glu */}
-        <View style={f.bmpRow}>
-          <View style={{ flex: 1 }}>{lc('k', 'K')}</View>
-          <View style={f.vDiv} />
-          <View style={{ flex: 1 }}>{lc('co2', 'CO₂')}</View>
-          <View style={f.vDiv} />
-          <View style={{ flex: 1 }}>{lc('cr', 'Cr')}</View>
-          <View style={f.vDiv} />
-          <View style={{ flex: 1 }}>{lc('glu', 'Glu')}</View>
-        </View>
-      </View>
+      {/* BMP fishbone — spine + two crossings + Glu fish-tail */}
+      <Text style={[s.fishTitle, { marginTop: 14 }]}>BMP / Chem</Text>
+      <BMPFishbone labs={labs} labRefs={labRefs} patchLab={pL} advance={advance} />
 
       {/* ── Diagnostics ─────────────────── */}
       <Text style={s.secTitle}>Diagnostics</Text>
@@ -225,40 +138,6 @@ export default function HAndPSection({ hp, onUpdate }: Props) {
   );
 }
 
-// ─── Fishbone styles ──────────────────────────────────────────
-const f = StyleSheet.create({
-  // CBC
-  cbcBox: {
-    flexDirection: 'row',
-    backgroundColor: BG,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: BORDER,
-    overflow: 'hidden',
-  },
-  cbcLeft:  { flex: 1, justifyContent: 'center' },
-  cbcRight: { flex: 1 },
-
-  // BMP
-  bmpBox: {
-    backgroundColor: BG,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: BORDER,
-    overflow: 'hidden',
-  },
-  bmpRow: { flexDirection: 'row' },
-  emptyCorner: { backgroundColor: '#F8F8F8' },
-
-  // Dividers — hairline Views, no border artifacts
-  vDiv: { width: 0.5, backgroundColor: BORDER },
-  hDiv: { height: 0.5, backgroundColor: BORDER },
-
-  // Cell
-  cell: { paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center' },
-  cellLabel: { fontSize: 10, fontWeight: '700', color: '#999', letterSpacing: 0.3, marginBottom: 4, textTransform: 'uppercase' },
-  cellInput: { fontSize: 20, fontWeight: '500', color: '#1C1C1E', width: '100%', paddingVertical: 0 },
-});
 
 // ─── Section styles ───────────────────────────────────────────
 const s = StyleSheet.create({
