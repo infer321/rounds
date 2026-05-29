@@ -184,7 +184,7 @@ export default function HomeScreen() {
                 placeholderTextColor="#BBB"
                 value={age}
                 onChangeText={setAge}
-                keyboardType="default"
+                keyboardType="number-pad"
                 maxLength={3}
                 returnKeyType="next"
               />

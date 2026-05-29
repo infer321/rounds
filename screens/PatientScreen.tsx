@@ -528,7 +528,7 @@ export default function PatientScreen() {
                   placeholderTextColor="#BBB"
                   value={editDetailsAge}
                   onChangeText={setEditDetailsAge}
-                  keyboardType="default"
+                  keyboardType="number-pad"
                   maxLength={3}
                   autoFocus
                   returnKeyType="next"

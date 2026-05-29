@@ -2,32 +2,36 @@ import { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { HAndP, Labs, Vitals } from '../data/patients';
 
+const BORDER = '#D8D8D8';
+const BG = '#fff';
+
+// Tab-order for auto-advance: CBC first, then BMP left-to-right top-to-bottom
 const LAB_ORDER: (keyof Labs)[] = ['wbc', 'hgb', 'plt', 'na', 'k', 'cl', 'co2', 'bun', 'cr', 'glu'];
 
-type Props = { hp: HAndP; onUpdate: (hp: HAndP) => void; };
+type Props = { hp: HAndP; onUpdate: (hp: HAndP) => void };
 
-// ── Lab cell ──────────────────────────────────────────────────
-function LabCell({
-  label, value, onChange, inputRef, onNext, isLast, borderRight, flex,
+// ─── Fish cell ────────────────────────────────────────────────
+function FishCell({
+  label, value, onChange, inputRef, onNext, isLast,
 }: {
-  label: string; value: string; onChange: (v: string) => void;
+  label: string; value: string;
+  onChange: (v: string) => void;
   inputRef: (r: TextInput | null) => void;
   onNext: () => void; isLast: boolean;
-  borderRight?: boolean; flex?: number;
 }) {
   return (
-    <View style={[s.labCell, borderRight && s.borderRight, flex !== undefined && { flex }]}>
-      <Text style={s.labLabel}>{label}</Text>
+    <View style={f.cell}>
+      <Text style={f.cellLabel}>{label}</Text>
       <TextInput
         ref={inputRef}
-        style={s.labInput}
+        style={f.cellInput}
         value={value}
         onChangeText={onChange}
-        keyboardType="numbers-and-punctuation"
+        keyboardType="decimal-pad"
         returnKeyType={isLast ? 'done' : 'next'}
         onSubmitEditing={isLast ? undefined : onNext}
         placeholder="—"
-        placeholderTextColor="#DDD"
+        placeholderTextColor="#CCC"
         textAlign="center"
         selectTextOnFocus
       />
@@ -35,20 +39,18 @@ function LabCell({
   );
 }
 
-// ── Vital cell ────────────────────────────────────────────────
-function VitCell({
-  label, value, onChange, flex,
-}: {
-  label: string; value: string; onChange: (v: string) => void; flex?: number;
+// ─── Vital cell ───────────────────────────────────────────────
+function VitCell({ label, value, onChange }: {
+  label: string; value: string; onChange: (v: string) => void;
 }) {
   return (
-    <View style={[s.vitCell, flex !== undefined && { flex }]}>
+    <View style={s.vitCell}>
       <Text style={s.vitLabel}>{label}</Text>
       <TextInput
         style={s.vitInput}
         value={value}
         onChangeText={onChange}
-        keyboardType="numbers-and-punctuation"
+        keyboardType="decimal-pad"
         placeholder="—"
         placeholderTextColor="#CCC"
         textAlign="center"
@@ -57,169 +59,165 @@ function VitCell({
   );
 }
 
-// ── Main component ────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────
 export default function HAndPSection({ hp, onUpdate }: Props) {
   const [local, setLocal] = useState<HAndP>(hp);
   const labRefs = useRef<Partial<Record<keyof Labs, TextInput | null>>>({});
 
-  function patch(updates: Partial<HAndP>) {
-    const next = { ...local, ...updates };
+  function patch(u: Partial<HAndP>) {
+    const next = { ...local, ...u };
     setLocal(next);
     onUpdate(next);
   }
-
-  function patchVitals(v: Partial<Vitals>) {
-    patch({ vitals: { ...local.vitals, ...v } });
-  }
-
-  function patchLab(key: keyof Labs, val: string) {
-    patch({ labs: { ...local.labs, [key]: val } });
-  }
-
-  function advanceLab(current: keyof Labs) {
-    const idx = LAB_ORDER.indexOf(current);
-    const next = LAB_ORDER[idx + 1];
+  function pV(v: Partial<Vitals>) { patch({ vitals: { ...local.vitals, ...v } }); }
+  function pL(key: keyof Labs, val: string) { patch({ labs: { ...local.labs, [key]: val } }); }
+  function advance(cur: keyof Labs) {
+    const next = LAB_ORDER[LAB_ORDER.indexOf(cur) + 1];
     if (next) labRefs.current[next]?.focus();
   }
 
-  const vit: Vitals = local.vitals ?? {};
-  const labs: Labs = local.labs ?? {};
+  const vit = local.vitals ?? {};
+  const labs = local.labs ?? {};
+
+  // Shorthand for a lab cell render
+  const lc = (key: keyof Labs, label: string) => (
+    <FishCell
+      label={label}
+      value={labs[key] ?? ''}
+      onChange={v => pL(key, v)}
+      inputRef={r => { labRefs.current[key] = r; }}
+      onNext={() => advance(key)}
+      isLast={key === 'glu'}
+    />
+  );
 
   return (
     <ScrollView
-      style={s.container}
+      style={s.scroll}
       contentContainerStyle={s.content}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* ── HPI ────────────────────────────── */}
-      <Text style={s.sectionTitle}>HPI</Text>
+      {/* ── HPI ─────────────────────────── */}
+      <Text style={s.secTitle}>HPI</Text>
       <TextInput style={s.note} value={local.hpi ?? ''} onChangeText={v => patch({ hpi: v })}
         multiline placeholder="History of present illness…" placeholderTextColor="#CCC" />
 
-      {/* ── ED / Hosp Course ───────────────── */}
-      <Text style={s.sectionTitle}>ED / Hosp Course</Text>
+      {/* ── ED / Hosp Course ────────────── */}
+      <Text style={s.secTitle}>ED / Hosp Course</Text>
       <TextInput style={s.note} value={local.course ?? ''} onChangeText={v => patch({ course: v })}
         multiline placeholder="Hospital / ED course…" placeholderTextColor="#CCC" />
 
-      {/* ── Vitals ─────────────────────────── */}
-      <Text style={s.sectionTitle}>Vitals</Text>
-
-      {/* Row: Temp RR HR BP */}
+      {/* ── Vitals ──────────────────────── */}
+      <Text style={s.secTitle}>Vitals</Text>
       <View style={s.vitRow}>
-        <VitCell label="Temp" value={vit.temp ?? ''} onChange={v => patchVitals({ temp: v })} />
-        <VitCell label="RR"   value={vit.rr ?? ''}   onChange={v => patchVitals({ rr: v })} />
-        <VitCell label="HR"   value={vit.hr ?? ''}   onChange={v => patchVitals({ hr: v })} />
-        {/* BP sys/dia */}
+        <VitCell label="Temp" value={vit.temp ?? ''} onChange={v => pV({ temp: v })} />
+        <VitCell label="RR"   value={vit.rr   ?? ''} onChange={v => pV({ rr: v })} />
+        <VitCell label="HR"   value={vit.hr   ?? ''} onChange={v => pV({ hr: v })} />
+        {/* BP */}
         <View style={[s.vitCell, { flex: 2 }]}>
           <Text style={s.vitLabel}>BP</Text>
           <View style={s.bpRow}>
-            <TextInput
-              style={[s.vitInput, { flex: 1 }]}
-              value={vit.bpS ?? ''}
-              onChangeText={v => patchVitals({ bpS: v })}
-              keyboardType="number-pad"
-              placeholder="sys"
-              placeholderTextColor="#CCC"
-              textAlign="center"
-            />
+            <TextInput style={[s.vitInput, { flex: 1 }]}
+              value={vit.bpS ?? ''} onChangeText={v => pV({ bpS: v })}
+              keyboardType="number-pad" placeholder="sys" placeholderTextColor="#CCC" textAlign="center" />
             <Text style={s.bpSlash}>/</Text>
-            <TextInput
-              style={[s.vitInput, { flex: 1 }]}
-              value={vit.bpD ?? ''}
-              onChangeText={v => patchVitals({ bpD: v })}
-              keyboardType="number-pad"
-              placeholder="dia"
-              placeholderTextColor="#CCC"
-              textAlign="center"
-            />
+            <TextInput style={[s.vitInput, { flex: 1 }]}
+              value={vit.bpD ?? ''} onChangeText={v => pV({ bpD: v })}
+              keyboardType="number-pad" placeholder="dia" placeholderTextColor="#CCC" textAlign="center" />
           </View>
         </View>
       </View>
 
-      {/* O₂ row */}
+      {/* O₂ */}
       <View style={s.o2Row}>
         <Text style={s.vitLabel}>O₂</Text>
         {(['RA', 'NC', 'BiPAP'] as const).map(mode => (
-          <TouchableOpacity
-            key={mode}
-            style={[s.o2Pill, vit.o2Mode === mode && s.o2PillActive]}
-            onPress={() => patchVitals({ o2Mode: mode, o2Val: mode === 'RA' ? undefined : vit.o2Val })}
-          >
-            <Text style={[s.o2PillText, vit.o2Mode === mode && s.o2PillTextActive]}>{mode}</Text>
+          <TouchableOpacity key={mode}
+            style={[s.o2Pill, vit.o2Mode === mode && s.o2Active]}
+            onPress={() => pV({ o2Mode: mode, o2Val: mode === 'RA' ? undefined : vit.o2Val })}>
+            <Text style={[s.o2Text, vit.o2Mode === mode && s.o2TextActive]}>{mode}</Text>
           </TouchableOpacity>
         ))}
         {vit.o2Mode && vit.o2Mode !== 'RA' && (
-          <TextInput
-            style={s.o2Input}
-            value={vit.o2Val ?? ''}
-            onChangeText={v => patchVitals({ o2Val: v })}
-            keyboardType="numbers-and-punctuation"
+          <TextInput style={s.o2Input}
+            value={vit.o2Val ?? ''} onChangeText={v => pV({ o2Val: v })}
+            keyboardType="decimal-pad"
             placeholder={vit.o2Mode === 'NC' ? 'L/min' : 'IPAP/EPAP'}
-            placeholderTextColor="#CCC"
-            textAlign="center"
-          />
+            placeholderTextColor="#CCC" textAlign="center" />
         )}
       </View>
 
-      {/* ── Physical Exam ──────────────────── */}
-      <Text style={s.sectionTitle}>Physical Exam</Text>
+      {/* ── Physical Exam ───────────────── */}
+      <Text style={s.secTitle}>Physical Exam</Text>
       <TextInput style={s.note} value={local.pe ?? ''} onChangeText={v => patch({ pe: v })}
         multiline placeholder="Exam findings…" placeholderTextColor="#CCC" />
 
-      {/* ── Labs ───────────────────────────── */}
-      <Text style={s.sectionTitle}>Labs</Text>
+      {/* ── Labs ────────────────────────── */}
+      <Text style={s.secTitle}>Labs</Text>
 
-      {/* CBC fishbone */}
-      <Text style={s.fishLabel}>CBC</Text>
-      <View style={s.fishRowBox}>
-        {/* Left col: WBC full height */}
-        <View style={[{ flex: 1 }, s.borderRight]}>
-          <LabCell label="WBC" value={labs.wbc ?? ''} onChange={v => patchLab('wbc', v)}
-            inputRef={r => { labRefs.current.wbc = r; }} onNext={() => advanceLab('wbc')} isLast={false} />
+      {/* CBC fishbone
+          ┌──────────┬──────────┐
+          │          │   Hgb    │
+          │   WBC    ├──────────┤
+          │          │   Plt    │
+          └──────────┴──────────┘  */}
+      <Text style={s.fishTitle}>CBC</Text>
+      <View style={f.cbcBox}>
+        {/* Left: WBC */}
+        <View style={f.cbcLeft}>
+          {lc('wbc', 'WBC')}
         </View>
-        {/* Right col: Hgb top / Plt bottom */}
-        <View style={{ flex: 1 }}>
-          <LabCell label="Hgb" value={labs.hgb ?? ''} onChange={v => patchLab('hgb', v)}
-            inputRef={r => { labRefs.current.hgb = r; }} onNext={() => advanceLab('hgb')} isLast={false} />
-          <View style={s.borderTop} />
-          <LabCell label="Plt" value={labs.plt ?? ''} onChange={v => patchLab('plt', v)}
-            inputRef={r => { labRefs.current.plt = r; }} onNext={() => advanceLab('plt')} isLast={false} />
+        {/* Vertical divider */}
+        <View style={f.vDiv} />
+        {/* Right: Hgb / Plt */}
+        <View style={f.cbcRight}>
+          {lc('hgb', 'Hgb')}
+          <View style={f.hDiv} />
+          {lc('plt', 'Plt')}
         </View>
       </View>
 
-      {/* BMP fishbone */}
-      <Text style={[s.fishLabel, { marginTop: 12 }]}>BMP</Text>
-      <View style={s.fishBox}>
-        {/* Row 1: Na Cl BUN */}
-        <View style={[s.fishBmpRow, s.borderBottom]}>
-          <LabCell label="Na"  value={labs.na ?? ''}  onChange={v => patchLab('na', v)}
-            inputRef={r => { labRefs.current.na = r; }} onNext={() => advanceLab('na')} isLast={false} borderRight flex={1} />
-          <LabCell label="Cl"  value={labs.cl ?? ''}  onChange={v => patchLab('cl', v)}
-            inputRef={r => { labRefs.current.cl = r; }} onNext={() => advanceLab('cl')} isLast={false} borderRight flex={1} />
-          <LabCell label="BUN" value={labs.bun ?? ''} onChange={v => patchLab('bun', v)}
-            inputRef={r => { labRefs.current.bun = r; }} onNext={() => advanceLab('bun')} isLast={false} flex={1} />
+      {/* BMP fishbone
+          ┌──────┬──────┬──────┐
+          │  Na  │  Cl  │ BUN  │░░░░░  ← top-right empty
+          ├──────┼──────┼──────┼──────┐
+          │  K   │  CO₂ │  Cr  │  Glu │
+          └──────┴──────┴──────┴──────┘ */}
+      <Text style={[s.fishTitle, { marginTop: 14 }]}>BMP</Text>
+      <View style={f.bmpBox}>
+        {/* Row 1: Na | Cl | BUN | [empty] – 4 equal columns */}
+        <View style={f.bmpRow}>
+          <View style={{ flex: 1 }}>{lc('na', 'Na')}</View>
+          <View style={f.vDiv} />
+          <View style={{ flex: 1 }}>{lc('cl', 'Cl')}</View>
+          <View style={f.vDiv} />
+          <View style={{ flex: 1 }}>{lc('bun', 'BUN')}</View>
+          <View style={f.vDiv} />
+          {/* empty top-right corner */}
+          <View style={[{ flex: 1 }, f.emptyCorner]} />
         </View>
-        {/* Row 2: K CO2 Cr Glu */}
-        <View style={s.fishBmpRow}>
-          <LabCell label="K"   value={labs.k ?? ''}   onChange={v => patchLab('k', v)}
-            inputRef={r => { labRefs.current.k = r; }} onNext={() => advanceLab('k')} isLast={false} borderRight flex={1} />
-          <LabCell label="CO2" value={labs.co2 ?? ''} onChange={v => patchLab('co2', v)}
-            inputRef={r => { labRefs.current.co2 = r; }} onNext={() => advanceLab('co2')} isLast={false} borderRight flex={1} />
-          <LabCell label="Cr"  value={labs.cr ?? ''}  onChange={v => patchLab('cr', v)}
-            inputRef={r => { labRefs.current.cr = r; }} onNext={() => advanceLab('cr')} isLast={false} borderRight flex={1} />
-          <LabCell label="Glu" value={labs.glu ?? ''} onChange={v => patchLab('glu', v)}
-            inputRef={r => { labRefs.current.glu = r; }} onNext={() => advanceLab('glu')} isLast={true} flex={1} />
+        {/* Horizontal divider */}
+        <View style={f.hDiv} />
+        {/* Row 2: K | CO₂ | Cr | Glu */}
+        <View style={f.bmpRow}>
+          <View style={{ flex: 1 }}>{lc('k', 'K')}</View>
+          <View style={f.vDiv} />
+          <View style={{ flex: 1 }}>{lc('co2', 'CO₂')}</View>
+          <View style={f.vDiv} />
+          <View style={{ flex: 1 }}>{lc('cr', 'Cr')}</View>
+          <View style={f.vDiv} />
+          <View style={{ flex: 1 }}>{lc('glu', 'Glu')}</View>
         </View>
       </View>
 
-      {/* ── Diagnostics ────────────────────── */}
-      <Text style={s.sectionTitle}>Diagnostics</Text>
+      {/* ── Diagnostics ─────────────────── */}
+      <Text style={s.secTitle}>Diagnostics</Text>
       <TextInput style={s.note} value={local.diagnostics ?? ''} onChangeText={v => patch({ diagnostics: v })}
         multiline placeholder="Imaging, EKG, procedures…" placeholderTextColor="#CCC" />
 
-      {/* ── A/P ────────────────────────────── */}
-      <Text style={s.sectionTitle}>Assessment / Plan</Text>
+      {/* ── A/P ─────────────────────────── */}
+      <Text style={s.secTitle}>Assessment / Plan</Text>
       <TextInput style={[s.note, { minHeight: 120 }]} value={local.ap ?? ''} onChangeText={v => patch({ ap: v })}
         multiline placeholder="Assessment and plan…" placeholderTextColor="#CCC" />
 
@@ -227,20 +225,58 @@ export default function HAndPSection({ hp, onUpdate }: Props) {
   );
 }
 
-const BORDER = '#E5E5EA';
+// ─── Fishbone styles ──────────────────────────────────────────
+const f = StyleSheet.create({
+  // CBC
+  cbcBox: {
+    flexDirection: 'row',
+    backgroundColor: BG,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: BORDER,
+    overflow: 'hidden',
+  },
+  cbcLeft:  { flex: 1, justifyContent: 'center' },
+  cbcRight: { flex: 1 },
 
+  // BMP
+  bmpBox: {
+    backgroundColor: BG,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: BORDER,
+    overflow: 'hidden',
+  },
+  bmpRow: { flexDirection: 'row' },
+  emptyCorner: { backgroundColor: '#F8F8F8' },
+
+  // Dividers — hairline Views, no border artifacts
+  vDiv: { width: 0.5, backgroundColor: BORDER },
+  hDiv: { height: 0.5, backgroundColor: BORDER },
+
+  // Cell
+  cell: { paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center' },
+  cellLabel: { fontSize: 10, fontWeight: '700', color: '#999', letterSpacing: 0.3, marginBottom: 4, textTransform: 'uppercase' },
+  cellInput: { fontSize: 20, fontWeight: '500', color: '#1C1C1E', width: '100%', paddingVertical: 0 },
+});
+
+// ─── Section styles ───────────────────────────────────────────
 const s = StyleSheet.create({
-  container: { flex: 1 },
+  scroll: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 48 },
 
-  sectionTitle: {
-    fontSize: 13, fontWeight: '600', color: '#999',
+  secTitle: {
+    fontSize: 12, fontWeight: '600', color: '#999',
     textTransform: 'uppercase', letterSpacing: 0.5,
     marginTop: 20, marginBottom: 8,
   },
+  fishTitle: {
+    fontSize: 11, fontWeight: '600', color: '#BBB',
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
+  },
 
   note: {
-    backgroundColor: '#fff', borderRadius: 12,
+    backgroundColor: BG, borderRadius: 12,
     borderWidth: 0.5, borderColor: BORDER,
     paddingHorizontal: 14, paddingVertical: 12,
     fontSize: 14, color: '#1C1C1E',
@@ -248,32 +284,18 @@ const s = StyleSheet.create({
   },
 
   // Vitals
-  vitRow: { flexDirection: 'row', gap: 8 },
+  vitRow:  { flexDirection: 'row', gap: 8 },
   vitCell: { flex: 1, alignItems: 'center' },
-  vitLabel: { fontSize: 10, fontWeight: '600', color: '#999', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 },
-  vitInput: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 0.5, borderColor: BORDER, paddingVertical: 10, fontSize: 15, color: '#1C1C1E', width: '100%' },
-  bpRow: { flexDirection: 'row', alignItems: 'center', gap: 3, width: '100%' },
+  vitLabel:{ fontSize: 10, fontWeight: '600', color: '#999', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 },
+  vitInput:{ backgroundColor: BG, borderRadius: 10, borderWidth: 0.5, borderColor: BORDER, paddingVertical: 10, fontSize: 15, color: '#1C1C1E', width: '100%' },
+  bpRow:   { flexDirection: 'row', alignItems: 'center', gap: 3, width: '100%' },
   bpSlash: { fontSize: 18, color: '#BBB', fontWeight: '300' },
 
-  // O2
-  o2Row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  o2Pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F0F0F0' },
-  o2PillActive: { backgroundColor: '#1C1C1E' },
-  o2PillText: { fontSize: 13, fontWeight: '500', color: '#555' },
-  o2PillTextActive: { color: '#fff' },
-  o2Input: { flex: 1, backgroundColor: '#fff', borderRadius: 10, borderWidth: 0.5, borderColor: BORDER, paddingVertical: 8, fontSize: 15, color: '#1C1C1E' },
-
-  // Fishbone
-  fishLabel: { fontSize: 11, fontWeight: '600', color: '#BBB', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  fishBox: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: BORDER, overflow: 'hidden' },
-  fishRowBox: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: BORDER, overflow: 'hidden', flexDirection: 'row' },
-  fishBmpRow: { flexDirection: 'row' },
-  labCell: { paddingVertical: 10, paddingHorizontal: 6, alignItems: 'center' },
-  labLabel: { fontSize: 10, fontWeight: '600', color: '#999', marginBottom: 3 },
-  labInput: { width: '100%', fontSize: 17, fontWeight: '500', color: '#1C1C1E', paddingVertical: 2 },
-
-  // Shared borders
-  borderRight: { borderRightWidth: 0.5, borderRightColor: BORDER },
-  borderTop:   { height: 0.5, backgroundColor: BORDER },
-  borderBottom: { borderBottomWidth: 0.5, borderBottomColor: BORDER },
+  // O₂
+  o2Row:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  o2Pill:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F0F0F0' },
+  o2Active:   { backgroundColor: '#1C1C1E' },
+  o2Text:     { fontSize: 13, fontWeight: '500', color: '#555' },
+  o2TextActive:{ color: '#fff' },
+  o2Input:    { flex: 1, backgroundColor: BG, borderRadius: 10, borderWidth: 0.5, borderColor: BORDER, paddingVertical: 8, fontSize: 15, color: '#1C1C1E' },
 });
