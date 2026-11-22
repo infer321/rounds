@@ -6,11 +6,14 @@
  *   vital prefix (t, hr, rr, bp, o2, sat…) → that vital, with H/L flag
  *   imaging prefix (xr, ct, mri, us, echo, img) → documented studies
  *   lab prefix (n → Na, cr → Cr…) → today's value, with H/L flag
+ *   ".xyz" → dot phrases;  "abx" → antibiotics with day count
  */
 import { HAndP, Labs } from '../data/patients';
 import { EXAM_SECTIONS } from '../data/examSections';
 import { LAB_LABEL, labFlag } from './clinical';
 import { vitalsLine } from './noteExport';
+import { abxDay } from './abx';
+import { Phrase, matchPhrases } from './phrases';
 
 import type { Suggestion } from '../context/KeyboardContext';
 
@@ -96,14 +99,23 @@ function labChips(hp: HAndP, word: string, from: number): Suggestion[] {
   });
 }
 
-export function suggestionsFor(text: string, caret: number, hp: HAndP): Suggestion[] {
+function abxChips(hp: HAndP, word: string, from: number): Suggestion[] {
+  if (!hp.abx?.length || !('abx'.startsWith(word) || 'antibiotics'.startsWith(word)) || word.length < 2) return [];
+  const all = hp.abx.map(a => `${a.name} D${abxDay(a.start)}`);
+  return [{ label: all.join(', '), insert: all.join(', '), replaceFrom: from }];
+}
+
+export function suggestionsFor(text: string, caret: number, hp: HAndP, phrases: Phrase[] = []): Suggestion[] {
   const { word, start, tail2 } = lastWords(text.slice(0, caret));
   if (!word) return [];
+  if (word.startsWith('.')) {
+    return matchPhrases(word, phrases).map(p => ({ label: `.${p.trigger}`, insert: p.text, replaceFrom: start }));
+  }
   if (PE_WORDS.includes(word) || PE_WORDS.includes(tail2)) {
     const c = examChips(hp, PE_WORDS.includes(tail2) ? caret - tail2.length : start);
     if (c.length) return c;
   }
-  for (const chips of [vitalChips(hp, word, start), imagingChips(hp, word, start), labChips(hp, word, start)]) {
+  for (const chips of [abxChips(hp, word, start), vitalChips(hp, word, start), imagingChips(hp, word, start), labChips(hp, word, start)]) {
     if (chips.length) return chips;
   }
   return [];

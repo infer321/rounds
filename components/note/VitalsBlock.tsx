@@ -34,6 +34,8 @@ function VitalsBlock({ vitals: v, prev: pv, onChange }: Props) {
         textAlign="center"
         selectTextOnFocus
         maxLength={MAXLEN[k]}
+        maxFontSizeMultiplier={1.2}
+        accessibilityLabel={`${label}${pv[k] ? `, previous ${pv[k]}` : ''}`}
       />
       <Text style={[st.prev, { color: flagColor(vitFlag(k, pv[k]), true) }]}>{pv[k] ? `${pv[k]}${unit ?? ''}` : ' '}</Text>
     </Pressable>
@@ -63,7 +65,7 @@ function VitalsBlock({ vitals: v, prev: pv, onChange }: Props) {
                   returnKeyType="next" submitBehavior="submit"
                   onSubmitEditing={() => next(k)}
                   placeholder="–" placeholderTextColor={C.ink4}
-                  textAlign="center" selectTextOnFocus maxLength={3}
+                  textAlign="center" selectTextOnFocus maxLength={3} maxFontSizeMultiplier={1.2}
                 />
               </View>
             ))}

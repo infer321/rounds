@@ -18,6 +18,7 @@ import Icon from '../components/Icon';
 import TabBar from '../components/TabBar';
 import PatientForm, { usePatientDraft } from '../components/PatientForm';
 import { EmptyState } from '../components/ui';
+import Onboarding from '../components/Onboarding';
 import { C, T, R, S } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -59,8 +60,8 @@ function PatientCard({ p, now, onPress, onLongPress }: { p: Patient; now: number
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { patients, addPatient, deletePatient, restorePatient, loadError } = usePatients();
-  const { settings } = useSettings();
+  const { patients, addPatient, deletePatient, restorePatient, restorePatients, addDemoPatient, loadError, loaded } = usePatients();
+  const { settings, update, ready } = useSettings();
   const toast = useToast();
   const now = useNow();
 
@@ -78,6 +79,23 @@ export default function HomeScreen() {
   ].filter(Boolean).join('  ·  ');
 
   const empties = Math.max(0, settings.slotCount - patients.length);
+  const stale = settings.staleDays
+    ? patients.filter(p => p.updatedAt && now - p.updatedAt > settings.staleDays * 86_400_000)
+    : [];
+
+  function clearStale() {
+    thud();
+    const removed = stale.map(p => deletePatient(p.id)).filter((p): p is Patient => !!p);
+    toast({ message: `Cleared ${removed.length} old patient${removed.length === 1 ? '' : 's'}`, onUndo: () => restorePatients(removed) });
+  }
+
+  function finishOnboarding(withDemo: boolean) {
+    update({ onboarded: true });
+    if (withDemo) {
+      const id = addDemoPatient();
+      setTimeout(() => navigation.navigate('Patient', { patientId: id, tab: 'hp' }), 350);
+    }
+  }
 
   function openAdd() { form.reset(); setAdding(true); }
   function add() {
@@ -96,17 +114,26 @@ export default function HomeScreen() {
 
   return (
     <View style={[st.screen, { paddingTop: insets.top + S.md }]}>
-      <StatusBar style="dark" />
+      <StatusBar style="auto" />
       <View style={st.top}>
         <View style={{ flex: 1 }}>
           <Text style={T.caption}>{today()}</Text>
           <Text style={[T.title, { marginTop: 2 }]}>Patients</Text>
         </View>
-        <Pressable onPress={openAdd} hitSlop={8} style={({ pressed }) => [st.addBtn, pressed && { opacity: 0.85 }]} accessibilityLabel="Add patient">
-          <Icon name="plus" size={20} color="#fff" strokeWidth={2.25} />
+        <Pressable onPress={openAdd} hitSlop={8} style={({ pressed }) => [st.addBtn, pressed && { opacity: 0.85 }]} accessibilityLabel="Add patient" testID="home-add">
+          <Icon name="plus" size={20} color={C.onInk} strokeWidth={2.25} />
         </Pressable>
       </View>
       {patients.length > 0 && <Text style={[st.summary, overdue > 0 && { color: C.high }]}>{summary}</Text>}
+
+      {stale.length > 0 && (
+        <View style={st.stale}>
+          <Text style={[T.small, { flex: 1, color: C.ink }]}>
+            {stale.map(p => p.initials).join(', ')} not edited in {settings.staleDays}+ days.
+          </Text>
+          <Pressable onPress={clearStale} hitSlop={8} accessibilityRole="button"><Text style={st.staleBtn}>Clear</Text></Pressable>
+        </View>
+      )}
 
       {loadError && (
         <View style={st.banner}>
@@ -126,7 +153,7 @@ export default function HomeScreen() {
               onLongPress={() => { tap(); setActionFor(p); }} />
           ))}
           {Array.from({ length: empties }).map((_, i) => (
-            <Pressable key={`e${i}`} onPress={openAdd} style={({ pressed }) => [st.slot, pressed && { backgroundColor: C.sunken }]}>
+            <Pressable key={`e${i}`} onPress={openAdd} accessibilityLabel="Add patient" style={({ pressed }) => [st.slot, pressed && { backgroundColor: C.sunken }]}>
               {i === 0 && <Icon name="plus" size={18} color={C.ink4} />}
             </Pressable>
           ))}
@@ -135,8 +162,10 @@ export default function HomeScreen() {
 
       <TabBar active="patients" />
 
+      <Onboarding visible={ready && loaded && !settings.onboarded} onDone={finishOnboarding} />
+
       <Sheet visible={adding} onClose={() => setAdding(false)} title="New patient"
-        footer={<><Btn label="Cancel" kind="secondary" onPress={() => setAdding(false)} /><Btn label="Add patient" onPress={add} disabled={!form.valid} flex={2} /></>}>
+        footer={<><Btn label="Cancel" kind="secondary" onPress={() => setAdding(false)} /><Btn label="Add patient" onPress={add} disabled={!form.valid} flex={2} testID="confirm-add-patient" /></>}>
         <PatientForm draft={form.draft} set={form.set} onSubmit={add} autoFocus />
       </Sheet>
 
@@ -157,6 +186,8 @@ const st = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: S.lg },
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
   summary: { ...T.small, paddingHorizontal: S.lg, marginTop: 4, marginBottom: S.md },
+  stale: { flexDirection: 'row', alignItems: 'center', gap: S.md, marginHorizontal: S.lg, marginBottom: S.md, padding: S.md, borderRadius: R.md, backgroundColor: C.flagBg },
+  staleBtn: { ...T.bodyM, color: C.flag },
   banner: { marginHorizontal: S.lg, marginBottom: S.md, padding: S.md, borderRadius: R.md, backgroundColor: C.highBg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: S.lg, paddingTop: S.sm, paddingBottom: S.xl, rowGap: S.md },
   card: { width: '48.4%', backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 0.5, borderColor: C.line, padding: S.md, minHeight: 138 },

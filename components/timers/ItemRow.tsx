@@ -16,7 +16,7 @@ export default function ItemRow({ item, now, onDone, onEdit, onFlag }: Props) {
   return (
     <Pressable onLongPress={() => { tap(); onEdit(); }} delayLongPress={350}
       style={({ pressed }) => [st.row, cd?.isOverdue && st.rowOverdue, pressed && { backgroundColor: C.sunken }]}>
-      <Pressable hitSlop={10} onPress={onDone} style={st.check} accessibilityLabel={`Mark ${item.label} done`}>
+      <Pressable hitSlop={10} onPress={onDone} style={st.check} accessibilityLabel={`Mark ${item.label} done`} testID={`done-${item.label}`}>
         <View style={st.ring} />
       </Pressable>
       <View style={{ flex: 1 }}>

@@ -8,11 +8,12 @@ import { HAndP } from '../../data/patients';
 import { LAB_LABEL, LAB_ORDER, LabKey, labFlag } from '../../utils/clinical';
 import { flagColor } from '../LabFishbone';
 import Icon from '../Icon';
-import { C, T, S } from '../../theme';
+import { C, T, S, useColor } from '../../theme';
 
 type Row = { key: string; label: string; values: (string | undefined)[]; flag: (v?: string) => 'H' | 'L' | null };
 
 function Spark({ values }: { values: (string | undefined)[] }) {
+  const hex = useColor();
   const nums = values.map(v => (v ? parseFloat(v) : NaN));
   const pts = nums.map((n, i) => ({ n, i })).filter(p => !isNaN(p.n));
   if (pts.length < 2) return <View style={{ width: 48 }} />;
@@ -22,8 +23,8 @@ function Spark({ values }: { values: (string | undefined)[] }) {
   const end = xy[xy.length - 1];
   return (
     <Svg width={W} height={H}>
-      <Polyline points={xy.map(p => p.join(',')).join(' ')} stroke={C.ink3} strokeWidth={1.25} fill="none" />
-      <Circle cx={end[0]} cy={end[1]} r={2} fill={C.ink} />
+      <Polyline points={xy.map(p => p.join(',')).join(' ')} stroke={hex(C.ink3)} strokeWidth={1.25} fill="none" />
+      <Circle cx={end[0]} cy={end[1]} r={2} fill={hex(C.ink)} />
     </Svg>
   );
 }
@@ -53,7 +54,7 @@ export default function TrendsSheet({ hp, visible, onClose }: { hp: HAndP; visib
       <View style={st.screen}>
         <View style={st.header}>
           <Text style={T.h2}>Trends</Text>
-          <Pressable onPress={onClose} hitSlop={12}><Icon name="close" /></Pressable>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close trends"><Icon name="close" /></Pressable>
         </View>
         {shown.length === 0 || hist.length === 0 ? (
           <Text style={st.empty}>

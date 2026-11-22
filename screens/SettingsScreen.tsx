@@ -12,6 +12,8 @@ import { C, T, S } from '../theme';
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
 const LOCK_OPTIONS = [[0, 'Immediately'], [1, '1 min'], [5, '5 min']] as const;
+const LOOK_OPTIONS = [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']] as const;
+const STALE_OPTIONS = [[0, 'Off'], [2, '2 days'], [3, '3 days'], [7, '7 days']] as const;
 
 function Row({ title, sub, right, onPress, danger }: { title: string; sub?: string; right?: React.ReactNode; onPress?: () => void; danger?: boolean }) {
   return (
@@ -65,6 +67,15 @@ export default function SettingsScreen() {
           <Row title="Census slots" sub="Empty cards shown on the patient grid" right={stepper} />
           <View style={st.div} />
           <Row title="Timer presets" sub="Add, rename or remove one-tap timers" onPress={() => navigation.navigate('Presets')} />
+          <View style={st.div} />
+          <Row title="Phrases" sub="Dot-phrase templates for the A/P (.aki, .chf…)" onPress={() => navigation.navigate('Phrases')} />
+        </View>
+
+        <Text style={st.sec}>Appearance</Text>
+        <View style={ui.card}>
+          <View style={[st.segWrap, { paddingTop: 14 }]}>
+            <Segmented options={LOOK_OPTIONS} value={settings.appearance} onChange={v => v && update({ appearance: v })} size="sm" />
+          </View>
         </View>
 
         <Text style={st.sec}>Privacy</Text>
@@ -81,6 +92,16 @@ export default function SettingsScreen() {
           <View style={st.div} />
           <Row title="Initials in notifications" sub="Off: lock screen shows only the timer label"
             right={<Switch value={settings.notifShowInitials} onValueChange={v => update({ notifShowInitials: v })} trackColor={{ true: C.ink }} />} />
+          <View style={st.div} />
+          <View style={st.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={T.body}>Old-patient reminder</Text>
+              <Text style={[T.caption, { marginTop: 2, fontWeight: '400' }]}>Suggest clearing patients not edited for</Text>
+            </View>
+          </View>
+          <View style={st.segWrap}>
+            <Segmented options={STALE_OPTIONS} value={settings.staleDays} onChange={v => v !== undefined && update({ staleDays: v })} size="sm" />
+          </View>
         </View>
         <Text style={st.foot}>
           Patient data is AES-256 encrypted on this phone. The key lives in the device keychain and is never synced or uploaded. The app has no server.
@@ -88,6 +109,8 @@ export default function SettingsScreen() {
 
         <Text style={st.sec}>Shift</Text>
         <View style={ui.card}>
+          <Row title="Show the walkthrough again" onPress={() => { update({ onboarded: false }); navigation.goBack(); }} />
+          <View style={st.div} />
           <Row title="Start new shift" sub="Clear every patient from this phone" onPress={newShift} danger />
         </View>
       </ScrollView>

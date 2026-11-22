@@ -57,7 +57,7 @@ export default function KeyboardAccessory() {
         >
           {suggestions.map((s, i) => (
             <TouchableOpacity key={i} style={st.chip} onPress={() => doInsert(s.insert, s.replaceFrom)}>
-              <Text style={st.chipText}>{s.label}</Text>
+              <Text maxFontSizeMultiplier={1.2} style={st.chipText}>{s.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -67,7 +67,7 @@ export default function KeyboardAccessory() {
       <View style={st.numRow} pointerEvents="auto">
         {[...KEYS, ...extraKeys].map(k => (
           <TouchableOpacity key={k} style={st.key} onPress={() => doInsert(k)}>
-            <Text style={st.keyText}>{k}</Text>
+            <Text maxFontSizeMultiplier={1.2} style={st.keyText}>{k}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -97,7 +97,7 @@ const st = StyleSheet.create({
     paddingVertical: 7,
   },
   chip: {
-    backgroundColor: '#fff',
+    backgroundColor: C.onInk,
     borderRadius: 8,
     paddingHorizontal: 11,
     paddingVertical: 5,
@@ -121,7 +121,7 @@ const st = StyleSheet.create({
   },
   key: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: C.onInk,
     borderRadius: 5,
     paddingVertical: 9,
     alignItems: 'center',

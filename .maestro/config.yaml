@@ -1,0 +1,5 @@
+# Run all flows:  maestro test .maestro
+# Needs: brew install maestro, an iOS simulator with the dev build installed,
+# and `npx expo start` running. Simulator without Face ID enrolled skips the lock.
+flows:
+  - "*.yaml"

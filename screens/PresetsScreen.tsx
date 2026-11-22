@@ -37,7 +37,7 @@ export default function PresetsScreen() {
   return (
     <Screen>
       <ScreenHeader title="Timer presets"
-        right={<Pressable onPress={() => open('new')} hitSlop={8} style={st.add} accessibilityLabel="New preset"><Icon name="plus" size={18} color="#fff" strokeWidth={2.25} /></Pressable>} />
+        right={<Pressable onPress={() => open('new')} hitSlop={8} style={st.add} accessibilityLabel="New preset"><Icon name="plus" size={18} color={C.onInk} strokeWidth={2.25} /></Pressable>} />
 
       <ScrollView contentContainerStyle={st.content}>
         <View style={ui.card}>

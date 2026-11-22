@@ -4,7 +4,9 @@
  * change in Settings didn't reach the Home screen until it remounted.)
  */
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BUILT_IN_PHRASES, Phrase } from '../utils/phrases';
 import { uid } from '../utils/id';
 
 export type Preset = { id: string; label: string; duration: string; builtIn?: boolean; hidden?: boolean };
@@ -21,17 +23,23 @@ export const BUILT_IN_PRESETS: Preset[] = [
   { id: 'bi9', label: 'Post-op vitals',   duration: '15m', builtIn: true },
 ];
 
+export type Appearance = 'system' | 'light' | 'dark';
+
 export type Settings = {
   slotCount: number;
   autoLockMin: number;        // 0 = lock as soon as app leaves foreground
   notifShowInitials: boolean; // patient initials on lock-screen notifications
+  appearance: Appearance;
+  staleDays: number;          // remind to clear patients untouched this long; 0 = off
+  onboarded: boolean;
 };
 
-const DEFAULTS: Settings = { slotCount: 8, autoLockMin: 1, notifShowInitials: false };
+const DEFAULTS: Settings = { slotCount: 8, autoLockMin: 1, notifShowInitials: false, appearance: 'system', staleDays: 3, onboarded: false };
 
 const K_SETTINGS = '@rounds_settings_v2';
 const K_SLOTS    = '@rounds_slot_count';   // legacy
 const K_PRESETS  = '@rounds_presets';
+const K_PHRASES  = '@rounds_phrases';
 
 type Ctx = {
   settings: Settings;
@@ -43,6 +51,10 @@ type Ctx = {
   editPreset: (id: string, label: string, duration: string) => void;
   deletePreset: (id: string) => void;
   restoreDefaults: () => void;
+  phrases: Phrase[];                      // built-ins + custom (custom wins on same trigger)
+  customPhrases: Phrase[];
+  savePhrase: (p: Omit<Phrase, 'id'> & { id?: string }) => void;
+  deletePhrase: (id: string) => void;
 };
 
 const SettingsCtx = createContext<Ctx | null>(null);
@@ -50,14 +62,16 @@ const SettingsCtx = createContext<Ctx | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const [custom, setCustom] = useState<Preset[]>([]);
+  const [customPhrases, setCustomPhrases] = useState<Phrase[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [rawS, rawSlots, rawP] = await Promise.all([
-          AsyncStorage.getItem(K_SETTINGS), AsyncStorage.getItem(K_SLOTS), AsyncStorage.getItem(K_PRESETS),
+        const [rawS, rawSlots, rawP, rawPh] = await Promise.all([
+          AsyncStorage.getItem(K_SETTINGS), AsyncStorage.getItem(K_SLOTS), AsyncStorage.getItem(K_PRESETS), AsyncStorage.getItem(K_PHRASES),
         ]);
+        if (rawPh) setCustomPhrases(JSON.parse(rawPh));
         const next = { ...DEFAULTS };
         if (rawSlots) next.slotCount = parseInt(rawSlots) || DEFAULTS.slotCount;
         if (rawS) Object.assign(next, JSON.parse(rawS));
@@ -69,6 +83,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setReady(true);
     })();
   }, []);
+
+  // Apply appearance override (null = follow the phone)
+  useEffect(() => {
+    Appearance.setColorScheme(settings.appearance === 'system' ? null : settings.appearance);
+  }, [settings.appearance]);
 
   const update = useCallback((p: Partial<Settings>) => {
     setSettings(prev => {
@@ -109,8 +128,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const restoreDefaults = () => saveCustom(custom.map(c => ({ ...c, hidden: false })));
 
+  function saveCustomPhrases(next: Phrase[]) {
+    setCustomPhrases(next);
+    AsyncStorage.setItem(K_PHRASES, JSON.stringify(next)).catch(() => undefined);
+  }
+  const savePhrase = (p: Omit<Phrase, 'id'> & { id?: string }) => {
+    const clean = { trigger: p.trigger.replace(/^\./, '').trim().toLowerCase(), text: p.text };
+    if (p.id && customPhrases.some(c => c.id === p.id)) saveCustomPhrases(customPhrases.map(c => (c.id === p.id ? { ...c, ...clean } : c)));
+    else saveCustomPhrases([...customPhrases, { id: uid(), ...clean }]);
+  };
+  const deletePhrase = (id: string) => saveCustomPhrases(customPhrases.filter(c => c.id !== id));
+  const phrases = [
+    ...customPhrases,
+    ...BUILT_IN_PHRASES.filter(b => !customPhrases.some(c => c.trigger === b.trigger)).map(b => ({ ...b, builtIn: true })),
+  ];
+
   return (
-    <SettingsCtx.Provider value={{ settings, ready, update, presets, hasHiddenBuiltIns, addPreset, editPreset, deletePreset, restoreDefaults }}>
+    <SettingsCtx.Provider value={{ settings, ready, update, presets, hasHiddenBuiltIns, addPreset, editPreset, deletePreset, restoreDefaults, phrases, customPhrases, savePhrase, deletePhrase }}>
       {children}
     </SettingsCtx.Provider>
   );

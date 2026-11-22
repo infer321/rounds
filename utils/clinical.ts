@@ -35,6 +35,9 @@ export const VIT_RANGES: Record<VitKey, [number, number]> = {
   temp: [36.0, 38.0], rr: [12, 20], hr: [60, 100], bpS: [90, 140], bpD: [60, 90], spo2: [92, 100],
 };
 
+/** IOP (mmHg): above 21 flags high; below 6 flags hypotony. */
+export const IOP_RANGE: [number, number] = [6, 21];
+
 export const PANELS: Record<Exclude<PanelKey, 'vitals'>, LabKey[]> = {
   cbc:  ['wbc', 'hgb', 'hct', 'plt'],
   bmp:  ['na', 'k', 'cl', 'co2', 'bun', 'cr', 'glu'],

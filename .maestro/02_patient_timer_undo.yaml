@@ -1,0 +1,29 @@
+appId: com.infer321.rounds
+name: Add patient → preset timer → done → undo
+---
+- launchApp:
+    clearState: true
+- tapOn: "Next"
+- tapOn: "Next"
+- tapOn: "Start empty"
+- tapOn:
+    id: "home-add"
+- tapOn:
+    id: "initials"
+- inputText: "ABC"
+- tapOn:
+    id: "descriptor"
+- inputText: "Test patient"
+- tapOn:
+    id: "confirm-add-patient"
+- tapOn: "Add the first timer or task"
+- tapOn: "Troponin repeat"
+- tapOn: "Done"
+- assertVisible: "Troponin repeat"
+- tapOn:
+    id: "done-Troponin repeat"
+- assertNotVisible:
+    id: "done-Troponin repeat"
+- tapOn: "Undo"
+- assertVisible:
+    id: "done-Troponin repeat"
