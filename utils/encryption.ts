@@ -15,11 +15,10 @@ import * as SecureStore from 'expo-secure-store';
 import * as ExpoCrypto from 'expo-crypto';
 import CryptoJS from 'crypto-js';
 
-const g = globalThis as any;
-if (!g.crypto) g.crypto = {};
-if (!g.crypto.getRandomValues) {
-  g.crypto.getRandomValues = (arr: Uint8Array) => ExpoCrypto.getRandomValues(arr);
-}
+type CryptoShim = { crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array } };
+const g = globalThis as unknown as CryptoShim;
+g.crypto ??= {};
+g.crypto.getRandomValues ??= (arr: Uint8Array) => ExpoCrypto.getRandomValues(arr);
 
 const KEY_NAME = 'rounds_aes_key_v1';
 const KEY_OPTS: SecureStore.SecureStoreOptions = {

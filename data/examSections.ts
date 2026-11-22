@@ -18,7 +18,7 @@ export const EXAM_SECTIONS: ExamSectionDef[] = [
     findings: [
       { key: 'illAppearing',   short: 'Appearance',   pos: 'ill appearing',              neg: 'well appearing' },
       { key: 'distress',       short: 'Distress',     pos: 'in acute distress',          neg: 'in no acute distress' },
-      { key: 'disoriented',    short: 'Orientation',  pos: 'disoriented',                neg: 'oriented ×3' },
+      { key: 'disoriented',    short: 'Orientation',  pos: 'disoriented',                neg: 'oriented x3' },
       { key: 'gaitDifficulty', short: 'Gait',         pos: 'ambulating with difficulty', neg: 'ambulating without difficulty' },
     ],
   },

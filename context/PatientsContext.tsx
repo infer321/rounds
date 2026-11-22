@@ -1,23 +1,15 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { AppState } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Patient, Item, HAndP, PanelKey } from '../data/patients';
 import { parseDurationMs } from '../utils/time';
-import { encryptData, decryptData } from '../utils/encryption';
+import { loadPatients, savePatients } from '../utils/patientStore';
 import { uid } from '../utils/id';
 import { advanceHP } from '../utils/rounds';
 import { useSettings } from './SettingsContext';
+import { scheduleTimer, cancelTimer } from '../utils/notifications';
 
-const STORAGE_KEY = '@rounds_patients';
 const SAVE_DEBOUNCE_MS = 1500; // flushed immediately when the app backgrounds
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false,
-    shouldShowBanner: true, shouldShowList: true,
-  }),
-});
 
 type HPUpdate = Partial<HAndP> | ((hp: HAndP) => HAndP);
 type Details = { initials?: string; age?: string; gender?: string; descriptor?: string };
@@ -44,6 +36,16 @@ type Ctx = {
   completeRound: (pid: string) => void;
 };
 
+/** Normalize patient detail fields (uppercase initials, empty → undefined). */
+function clean(d: Details) {
+  const out: Details = {};
+  if (d.initials !== undefined) out.initials = d.initials.trim().toUpperCase().slice(0, 3);
+  if (d.age !== undefined) out.age = d.age.trim() || undefined;
+  if (d.gender !== undefined) out.gender = d.gender || undefined;
+  if (d.descriptor !== undefined) out.descriptor = d.descriptor.trim() || undefined;
+  return out;
+}
+
 const PatientsContext = createContext<Ctx | null>(null);
 
 export function PatientsProvider({ children }: { children: ReactNode }) {
@@ -54,29 +56,15 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
   const latest = useRef<Patient[]>([]);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const askedPermission = useRef(false);
   latest.current = patients;
 
   // ── Load ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const plain = (await decryptData(raw)) ?? (raw.trim().startsWith('[') ? raw : null);
-          if (plain) {
-            setPatients(JSON.parse(plain));
-          } else {
-            // Never overwrite data we can't read. Park it and start empty.
-            await AsyncStorage.setItem(`${STORAGE_KEY}_unreadable_${Date.now()}`, raw);
-            setLoadError(true);
-          }
-        }
-      } catch {
-        setLoadError(true);
-      }
+    loadPatients().then(({ patients: p, error }) => {
+      setPatients(p);
+      setLoadError(error);
       setLoaded(true);
-    })();
+    });
   }, []);
 
   // ── Save: debounced, encrypted, flushed when app backgrounds ────────────
@@ -85,8 +73,7 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
     if (!dirty.current) return;
     dirty.current = false;
     try {
-      const cipher = await encryptData(JSON.stringify(latest.current));
-      await AsyncStorage.setItem(STORAGE_KEY, cipher);
+      await savePatients(latest.current);
     } catch (e) {
       dirty.current = true; // retry next change
       console.warn('[rounds] save failed', e);
@@ -106,38 +93,15 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
   }, [flush]);
 
   // ── Notifications ───────────────────────────────────────────────────────
-  async function schedule(label: string, endsAt: number, initials?: string): Promise<string | undefined> {
-    try {
-      if (!askedPermission.current) {
-        askedPermission.current = true;
-        await Notifications.requestPermissionsAsync();
-      }
-      return await Notifications.scheduleNotificationAsync({
-        content: {
-          title: label,
-          body: settings.notifShowInitials && initials ? `${initials} · timer done` : 'Timer done',
-          sound: true,
-        },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(endsAt) },
-      });
-    } catch { return undefined; }
-  }
-  const cancel = (id?: string) => { if (id) Notifications.cancelScheduledNotificationAsync(id).catch(() => {}); };
+  const schedule = (label: string, endsAt: number, initials?: string) =>
+    scheduleTimer(label, endsAt, settings.notifShowInitials ? initials : undefined);
+  const cancel = cancelTimer;
   const cancelAll = (p: Patient) => p.items.forEach(i => cancel(i.notificationId));
 
   const mapPatient = (pid: string, fn: (p: Patient) => Patient) =>
     setPatients(prev => prev.map(p => (p.id === pid ? fn(p) : p)));
 
   // ── Patients ────────────────────────────────────────────────────────────
-  function clean(d: Details) {
-    const out: Details = {};
-    if (d.initials !== undefined) out.initials = d.initials.trim().toUpperCase().slice(0, 3);
-    if (d.age !== undefined) out.age = d.age.trim() || undefined;
-    if (d.gender !== undefined) out.gender = d.gender || undefined;
-    if (d.descriptor !== undefined) out.descriptor = d.descriptor.trim() || undefined;
-    return out;
-  }
-
   function addPatient(d: Details & { initials: string }) {
     const id = uid();
     setPatients(prev => [...prev, { id, colorIndex: 0, items: [], ...clean(d) } as Patient]);
@@ -210,8 +174,7 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
   }
 
   async function restoreItem(pid: string, item: Item) {
-    let restored = { ...item, notificationId: undefined as string | undefined };
-    mapPatient(pid, p => ({ ...p, items: [...p.items, restored] }));
+    mapPatient(pid, p => ({ ...p, items: [...p.items, { ...item, notificationId: undefined }] }));
     if (item.type === 'timer' && item.endsAt && item.endsAt > Date.now()) {
       const nid = await schedule(item.label, item.endsAt, latest.current.find(p => p.id === pid)?.initials);
       mapPatient(pid, p => ({ ...p, items: p.items.map(i => (i.id === item.id ? { ...i, notificationId: nid } : i)) }));

@@ -10,14 +10,22 @@ Clinical workflow app for med students/residents. React Native 0.81 + Expo SDK 5
 - Haptics via `utils/haptics.ts`.
 
 ## Map
+- `components/ui.tsx` — Screen, ScreenHeader, Segmented, Field, Card, EmptyState. Use these; don't hand-roll headers or segmented controls
 - `context/SettingsContext` — settings + timer presets (shared store)
 - `context/PatientsContext` — patients, items, notifications, `patchHP` (functional), `advancePanel` / `completeRound`
 - `utils/clinical.ts` — ranges, labels, panels, H/L flags (single source of truth)
 - `utils/noteExport.ts` — plain-text H&P / SOAP / signout for Teams → Cerner paste
 - `utils/rounds.ts` — snapshot/advance logic (pure, tested)
-- `components/NoteEditor.tsx` — H&P and SOAP tabs (one component, `mode` prop)
-- `components/TimersTab.tsx` — owns the 1s clock; keep `useNow` out of note screens
+- `utils/apSuggestions.ts` — A/P autocomplete chips (pure, tested)
+- `utils/patientStore.ts` — encrypted load/save; `utils/notifications.ts` — timer notifications
+- `utils/memo.ts` — `memoData()`: memo that ignores callback props (heavy note blocks)
+- `components/NoteEditor.tsx` + `components/note/` — H&P and SOAP tabs (one component, `mode` prop)
+- `components/TimersTab.tsx` + `components/timers/` — owns the 1s clock; keep `useNow` out of note screens
 - `components/FindingsBuilder.tsx` — exam + ROS builders
+
+## Performance rules
+- Long text fields buffer locally (`useBufferedText`) and commit on pause/blur/background. Never write to context per keystroke.
+- Text fields use `useKbCtx()` (stable actions). Only the toolbar reads `useKbState()`.
 
 ## Checks before shipping
 `npx tsc --noEmit` and `npx expo export --platform ios --output-dir /tmp/exp`

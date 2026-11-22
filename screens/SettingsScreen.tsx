@@ -1,16 +1,17 @@
 import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Switch } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../App';
 import { usePatients } from '../context/PatientsContext';
 import { useSettings } from '../context/SettingsContext';
 import { tap, warn } from '../utils/haptics';
 import Icon from '../components/Icon';
-import { C, T, R, S } from '../theme';
+import { Screen, ScreenHeader, Segmented, ui } from '../components/ui';
+import { C, T, S } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
+
+const LOCK_OPTIONS = [[0, 'Immediately'], [1, '1 min'], [5, '5 min']] as const;
 
 function Row({ title, sub, right, onPress, danger }: { title: string; sub?: string; right?: React.ReactNode; onPress?: () => void; danger?: boolean }) {
   return (
@@ -26,7 +27,6 @@ function Row({ title, sub, right, onPress, danger }: { title: string; sub?: stri
 
 export default function SettingsScreen() {
   const navigation = useNavigation<Nav>();
-  const insets = useSafeAreaInsets();
   const { clearAll, patients } = usePatients();
   const { settings, update } = useSettings();
 
@@ -56,23 +56,19 @@ export default function SettingsScreen() {
   );
 
   return (
-    <View style={[st.screen, { paddingTop: insets.top + S.sm }]}>
-      <StatusBar style="dark" />
-      <View style={st.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={st.iconBtn}><Icon name="back" size={22} /></Pressable>
-        <Text style={T.h2}>Settings</Text>
-      </View>
+    <Screen>
+      <ScreenHeader title="Settings" />
 
       <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
         <Text style={st.sec}>List</Text>
-        <View style={st.card}>
+        <View style={ui.card}>
           <Row title="Census slots" sub="Empty cards shown on the patient grid" right={stepper} />
           <View style={st.div} />
           <Row title="Timer presets" sub="Add, rename or remove one-tap timers" onPress={() => navigation.navigate('Presets')} />
         </View>
 
         <Text style={st.sec}>Privacy</Text>
-        <View style={st.card}>
+        <View style={ui.card}>
           <View style={st.row}>
             <View style={{ flex: 1 }}>
               <Text style={T.body}>Auto-lock</Text>
@@ -80,16 +76,7 @@ export default function SettingsScreen() {
             </View>
           </View>
           <View style={st.segWrap}>
-            <View style={st.seg}>
-              {[[0, 'Immediately'], [1, '1 min'], [5, '5 min']].map(([v, l]) => {
-                const on = settings.autoLockMin === v;
-                return (
-                  <Pressable key={v} style={[st.segBtn, on && st.segOn]} onPress={() => { tap(); update({ autoLockMin: v as number }); }}>
-                    <Text style={[T.small, { color: on ? C.ink : C.ink3, fontWeight: on ? '600' : '400' }]}>{l}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Segmented options={LOCK_OPTIONS} value={settings.autoLockMin} onChange={v => v !== undefined && update({ autoLockMin: v })} size="sm" />
           </View>
           <View style={st.div} />
           <Row title="Initials in notifications" sub="Off: lock screen shows only the timer label"
@@ -100,29 +87,22 @@ export default function SettingsScreen() {
         </Text>
 
         <Text style={st.sec}>Shift</Text>
-        <View style={st.card}>
+        <View style={ui.card}>
           <Row title="Start new shift" sub="Clear every patient from this phone" onPress={newShift} danger />
         </View>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const st = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: S.sm, paddingHorizontal: S.md, marginBottom: S.md },
-  iconBtn:{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   content:{ paddingHorizontal: S.lg, paddingBottom: 60 },
   sec:    { ...T.label, marginTop: S.xl, marginBottom: S.sm, marginLeft: 4 },
-  card:   { backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 0.5, borderColor: C.line, overflow: 'hidden' },
   row:    { flexDirection: 'row', alignItems: 'center', gap: S.md, paddingHorizontal: S.lg, paddingVertical: 14 },
   div:    { height: 0.5, backgroundColor: C.line, marginLeft: S.lg },
   stepper:{ flexDirection: 'row', alignItems: 'center', gap: S.md },
   step:   { width: 30, height: 30, borderRadius: 15, backgroundColor: C.sunken, alignItems: 'center', justifyContent: 'center' },
   stepVal:{ ...T.bodyM, ...T.num, minWidth: 20, textAlign: 'center' },
   segWrap:{ paddingHorizontal: S.lg, paddingBottom: 14 },
-  seg:    { flexDirection: 'row', backgroundColor: C.sunken, borderRadius: R.sm + 2, padding: 2 },
-  segBtn: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: R.sm },
-  segOn:  { backgroundColor: C.surface },
   foot:   { ...T.caption, fontWeight: '400', color: C.ink3, marginTop: S.sm, marginHorizontal: 4, lineHeight: 17 },
 });

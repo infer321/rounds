@@ -8,10 +8,11 @@ import { memo, ComponentType } from 'react';
  * while you type in a different field.
  */
 export function memoData<P extends object>(C: ComponentType<P>) {
-  return memo(C, (a: any, b: any) => {
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return memo(C, (a: Readonly<P>, b: Readonly<P>) => {
+    const ra = a as Record<string, unknown>, rb = b as Record<string, unknown>;
+    const keys = new Set([...Object.keys(ra), ...Object.keys(rb)]);
     for (const k of keys) {
-      const x = a[k], y = b[k];
+      const x = ra[k], y = rb[k];
       if (typeof x === 'function' && typeof y === 'function') continue;
       if (Array.isArray(x) && Array.isArray(y)) {
         if (x.length !== y.length || x.some((v, i) => v !== y[i])) return false;

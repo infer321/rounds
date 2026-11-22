@@ -10,17 +10,18 @@ import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../App';
-import { Patient, PanelKey, Labs, Vitals } from '../data/patients';
+import { Patient, PanelKey, Vitals } from '../data/patients';
 import { usePatients } from '../context/PatientsContext';
 import { useToast } from '../context/ToastContext';
 import { useScrollToCenter } from '../hooks/useScrollToCenter';
-import { LAB_ORDER, LabKey, PANELS, PANEL_LABEL, hasAny, vitalsHasData } from '../utils/clinical';
+import { PANEL_LABEL, hasAny, vitalsHasData } from '../utils/clinical';
 import { buildHP, buildSOAP, examLines, rosLines } from '../utils/noteExport';
 import { success, thud } from '../utils/haptics';
-import { CBCFishbone, BMPFishbone, LFTFishbone, LabRow } from './LabFishbone';
 import VitalsBlock from './note/VitalsBlock';
 import FindingsCard from './note/FindingsCard';
 import NoteField from './note/NoteField';
+import LabsSection from './note/LabsSection';
+import { Section, SmallBtn } from './note/Section';
 import TrendsSheet from './note/TrendsSheet';
 import DiagnosticsInput from './DiagnosticsInput';
 import APInput from './APInput';
@@ -30,52 +31,23 @@ import { C, T, R, S } from '../theme';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 // Stable empties so memoized blocks don't re-render on every keystroke
-const NO_LABS: Labs = {};
 const NO_VITALS: Vitals = {};
-
-function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <View style={st.section}>
-      <View style={st.secHead}>
-        <Text style={T.label}>{title}</Text>
-        {action}
-      </View>
-      {children}
-    </View>
-  );
-}
-
-function SmallBtn({ label, onPress, icon, disabled }: { label: string; onPress: () => void; icon?: 'trend' | 'copy' | 'check'; disabled?: boolean }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={8}
-      style={({ pressed }) => [st.smallBtn, pressed && { backgroundColor: C.sunken }, disabled && { opacity: 0.35 }]}>
-      {icon && <Icon name={icon} size={14} color={C.ink2} strokeWidth={2} />}
-      <Text style={st.smallBtnText}>{label}</Text>
-    </Pressable>
-  );
-}
 
 export default function NoteEditor({ patient, mode }: { patient: Patient; mode: 'hp' | 'soap' }) {
   const navigation = useNavigation<Nav>();
   const { patchHP, advancePanel, completeRound } = usePatients();
   const toast = useToast();
   const { scrollRef, scrollProps, centerInput } = useScrollToCenter();
-  const labRefs = useRef<Partial<Record<LabKey, TextInput | null>>>({});
   const apRef = useRef<View>(null);
   const [trends, setTrends] = useState(false);
 
   const pid = patient.id;
   const hp = patient.hp ?? {};
-  const labs = hp.labs ?? NO_LABS;
-  const prevLabs = hp.prevLabs ?? NO_LABS;
   const patch = (u: Parameters<typeof patchHP>[1]) => patchHP(pid, u);
-  const pL = (k: LabKey, v: string) => patch(h => ({ ...h, labs: { ...h.labs, [k]: v } as Labs }));
   const pV = (v: Partial<Vitals>) => patch(h => ({ ...h, vitals: { ...h.vitals, ...v } }));
-  const nextLab = (k: LabKey) => labRefs.current[LAB_ORDER[LAB_ORDER.indexOf(k) + 1]]?.focus();
   const center = (n: TextInput | null) => centerInput(n);
 
-  const panelHasData = (p: Exclude<PanelKey, 'vitals'>) => PANELS[p].some(k => labs[k]);
-  const anyToAdvance = vitalsHasData(hp.vitals) || hasAny(labs);
+  const anyToAdvance = vitalsHasData(hp.vitals) || hasAny(hp.labs);
 
   function advance(p: PanelKey) {
     thud();
@@ -97,8 +69,6 @@ export default function NoteEditor({ patient, mode }: { patient: Patient; mode: 
     toast({ message: `${mode === 'hp' ? 'H&P' : 'SOAP note'} copied. Paste into Teams or the EMR.` });
   }
 
-  const fishProps = { labs, prevLabs, labRefs, patchLab: pL, advance: nextLab };
-  const advBtn = (p: Exclude<PanelKey, 'vitals'>) => <SmallBtn label="Advance" onPress={() => advance(p)} disabled={!panelHasData(p)} />;
 
   return (
     <>
@@ -162,18 +132,7 @@ export default function NoteEditor({ patient, mode }: { patient: Patient; mode: 
           />
         </Section>
 
-        <Section title="Labs" action={<SmallBtn label="Trends" icon="trend" onPress={() => setTrends(true)} />}>
-          <View style={{ gap: S.lg }}>
-            <View><View style={st.panelHead}><Text style={st.panelTitle}>CBC</Text>{advBtn('cbc')}</View><CBCFishbone {...fishProps} /></View>
-            <View><View style={st.panelHead}><Text style={st.panelTitle}>BMP</Text>{advBtn('bmp')}</View><BMPFishbone {...fishProps} /></View>
-            <View><View style={st.panelHead}><Text style={st.panelTitle}>CMP / LFT</Text>{advBtn('lft')}</View><LFTFishbone {...fishProps} /></View>
-            <View><View style={st.panelHead}><Text style={st.panelTitle}>Mg / Coags</Text>{advBtn('coag')}</View><LabRow {...fishProps} keys={PANELS.coag} /></View>
-            <View>
-              <View style={st.panelHead}><Text style={st.panelTitle}>Other</Text></View>
-              <NoteField value={hp.otherLabs ?? ''} onCommit={v => patch({ otherLabs: v })} placeholder="Lactate 2.1, trop <6, BNP 840, BCx NGTD…" minHeight={48} onFocused={center} />
-            </View>
-          </View>
-        </Section>
+        <LabsSection patient={patient} onAdvance={advance} onTrends={() => setTrends(true)} onFocusField={center} />
 
         <Section title="Imaging">
           <DiagnosticsInput studies={hp.imagingStudies ?? []} onChange={studies => patch({ imagingStudies: studies })} />
@@ -203,10 +162,4 @@ const st = StyleSheet.create({
   primaryText: { ...T.bodyM, color: '#fff' },
   secondary: { flex: 1, flexDirection: 'row', gap: S.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface, borderWidth: 0.5, borderColor: C.lineStrong, borderRadius: R.md, paddingVertical: 12 },
   secondaryText: { ...T.bodyM },
-  section: { marginTop: S.xl },
-  secHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: S.sm, minHeight: 24 },
-  panelHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, minHeight: 24 },
-  panelTitle: { ...T.caption, color: C.ink2 },
-  smallBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: R.pill, borderWidth: 0.5, borderColor: C.lineStrong, backgroundColor: C.surface },
-  smallBtnText: { ...T.caption, color: C.ink2 },
 });

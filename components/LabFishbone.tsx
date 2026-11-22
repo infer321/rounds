@@ -14,7 +14,7 @@ const STROKE = C.lineStrong;
 const SW = 1.25;
 
 export const flagColor = (f: Flag, faded = false) =>
-  f === 'H' ? (faded ? '#D9A19C' : C.high) : f === 'L' ? (faded ? '#97B4D6' : C.low) : (faded ? C.ink4 : C.ink);
+  f === 'H' ? (faded ? C.highFaded : C.high) : f === 'L' ? (faded ? C.lowFaded : C.low) : (faded ? C.ink4 : C.ink);
 
 type Refs = MutableRefObject<Partial<Record<LabKey, TextInput | null>>>;
 type FishProps = {
@@ -97,64 +97,46 @@ function CBCFishboneBase(props: FishProps) {
   );
 }
 
-//  Na | Cl | BUN \
-//  ───────────────  Glu
-//  K  | CO2| Cr  /
-function BMPFishboneBase(props: FishProps) {
+/**
+ * Split fishbone used by BMP and CMP/LFT:
+ *   top[0] | top[1] | … \
+ *   ─────────────────────  tail
+ *   bot[0] | bot[1] | … /
+ */
+function SplitFishboneBase(props: FishProps & { top: LabKey[]; bottom: LabKey[]; tail: LabKey }) {
   const { w, onLayout } = useWidth();
-  const cy = H / 2, v1 = w * 0.25, v2 = w * 0.5, tail = w * 0.75, out = w * 0.95;
+  const { top, bottom, tail } = props;
   const c = cellFactory(props);
+  const cols = top.length;
+  const tailX = w * (1 - 1 / (cols + 1));          // tail gets one column's width
+  const colW = tailX / cols;
+  const cy = H / 2;
   return (
     <View style={[st.box, { height: H }]} onLayout={onLayout}>
       {w > 0 && <>
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Line x1={0} y1={cy} x2={tail} y2={cy} stroke={STROKE} strokeWidth={SW} />
-          <Line x1={v1} y1={12} x2={v1} y2={H - 12} stroke={STROKE} strokeWidth={SW} />
-          <Line x1={v2} y1={12} x2={v2} y2={H - 12} stroke={STROKE} strokeWidth={SW} />
-          <Line x1={tail} y1={cy} x2={out} y2={10} stroke={STROKE} strokeWidth={SW} />
-          <Line x1={tail} y1={cy} x2={out} y2={H - 10} stroke={STROKE} strokeWidth={SW} />
+          <Line x1={0} y1={cy} x2={tailX} y2={cy} stroke={STROKE} strokeWidth={SW} />
+          {top.slice(1).map((_, i) => {
+            const x = colW * (i + 1);
+            return <Line key={x} x1={x} y1={12} x2={x} y2={H - 12} stroke={STROKE} strokeWidth={SW} />;
+          })}
+          <Line x1={tailX} y1={cy} x2={w * 0.96} y2={10} stroke={STROKE} strokeWidth={SW} />
+          <Line x1={tailX} y1={cy} x2={w * 0.96} y2={H - 10} stroke={STROKE} strokeWidth={SW} />
         </Svg>
-        {c('na', abs(0, 0, v1, cy))}
-        {c('k', abs(0, cy, v1, H - cy))}
-        {c('cl', abs(v1, 0, v2 - v1, cy))}
-        {c('co2', abs(v1, cy, v2 - v1, H - cy))}
-        {c('bun', abs(v2, 0, tail - v2, cy))}
-        {c('cr', abs(v2, cy, tail - v2, H - cy))}
-        {c('glu', abs(tail, 0, w - tail, H))}
+        {top.map((k, i) => c(k, abs(colW * i, 0, colW, cy)))}
+        {bottom.map((k, i) => c(k, abs(colW * i, cy, colW, H - cy)))}
+        {c(tail, abs(tailX, 0, w - tailX, H))}
       </>}
     </View>
   );
 }
+const SplitFishbone = memoData(SplitFishboneBase);
 
-//  Ca | TP | AST | LDH \
-//  ──────────────────── Tbili
-//  Phos| Alb| ALT | ALP /
-function LFTFishboneBase(props: FishProps) {
-  const { w, onLayout } = useWidth();
-  const cy = H / 2, v1 = w * 0.2, v2 = w * 0.4, v3 = w * 0.6, tail = w * 0.8, out = w * 0.96;
-  const c = cellFactory(props);
-  return (
-    <View style={[st.box, { height: H }]} onLayout={onLayout}>
-      {w > 0 && <>
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Line x1={0} y1={cy} x2={tail} y2={cy} stroke={STROKE} strokeWidth={SW} />
-          {[v1, v2, v3].map(x => <Line key={x} x1={x} y1={12} x2={x} y2={H - 12} stroke={STROKE} strokeWidth={SW} />)}
-          <Line x1={tail} y1={cy} x2={out} y2={10} stroke={STROKE} strokeWidth={SW} />
-          <Line x1={tail} y1={cy} x2={out} y2={H - 10} stroke={STROKE} strokeWidth={SW} />
-        </Svg>
-        {c('ca', abs(0, 0, v1, cy))}
-        {c('po4', abs(0, cy, v1, H - cy))}
-        {c('tp', abs(v1, 0, v2 - v1, cy))}
-        {c('alb', abs(v1, cy, v2 - v1, H - cy))}
-        {c('ast', abs(v2, 0, v3 - v2, cy))}
-        {c('alt', abs(v2, cy, v3 - v2, H - cy))}
-        {c('ldh', abs(v3, 0, tail - v3, cy))}
-        {c('ap', abs(v3, cy, tail - v3, H - cy))}
-        {c('bili', abs(tail, 0, w - tail, H))}
-      </>}
-    </View>
-  );
-}
+export const BMPFishbone = (p: FishProps) =>
+  <SplitFishbone {...p} top={['na', 'cl', 'bun']} bottom={['k', 'co2', 'cr']} tail="glu" />;
+
+export const LFTFishbone = (p: FishProps) =>
+  <SplitFishbone {...p} top={['ca', 'tp', 'ast', 'ldh']} bottom={['po4', 'alb', 'alt', 'ap']} tail="bili" />;
 
 /** Plain row of cells (Mg + coags). */
 function LabRowBase(props: FishProps & { keys: LabKey[] }) {
@@ -179,6 +161,4 @@ const st = StyleSheet.create({
   unitLabel: { fontSize: 9, fontWeight: '600', color: C.ink4, letterSpacing: 0.3, height: 12 },
 });
 export const CBCFishbone = memoData(CBCFishboneBase);
-export const BMPFishbone = memoData(BMPFishboneBase);
-export const LFTFishbone = memoData(LFTFishboneBase);
 export const LabRow = memoData(LabRowBase);

@@ -6,14 +6,12 @@
  */
 import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../App';
 import { usePatients } from '../context/PatientsContext';
 import { useToast } from '../context/ToastContext';
 import { tap, thud } from '../utils/haptics';
-import Icon from './Icon';
+import { Screen, ScreenHeader } from './ui';
 import { C, T, R, S } from '../theme';
 
 type Finding = { key: string; short: string };
@@ -31,8 +29,6 @@ type Props = {
 };
 
 export default function FindingsBuilder({ title, sections, field, posWord, negWord, allNegLabel, sensitiveLabel }: Props) {
-  const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   const { params } = useRoute<RouteProp<RootStackParamList, 'ExamBuilder'>>();
   const { patients, patchHP } = usePatients();
   const toast = useToast();
@@ -69,16 +65,9 @@ export default function FindingsBuilder({ title, sections, field, posWord, negWo
   const count = Object.keys(state).length;
 
   return (
-    <View style={[st.screen, { paddingTop: insets.top + S.sm }]}>
-      <StatusBar style="dark" />
-      <View style={st.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={st.iconBtn}><Icon name="back" size={22} /></Pressable>
-        <View style={{ flex: 1 }}>
-          <Text style={T.h2}>{title}</Text>
-          <Text style={T.caption}>Tap: {negWord} → {posWord} → clear</Text>
-        </View>
-        {count > 0 && <Pressable onPress={clearAll} hitSlop={8}><Text style={[T.small, { color: C.high }]}>Clear</Text></Pressable>}
-      </View>
+    <Screen>
+      <ScreenHeader title={title} subtitle={`Tap: ${negWord} → ${posWord} → clear`}
+        right={count > 0 && <Pressable onPress={clearAll} hitSlop={8}><Text style={[T.small, { color: C.high }]}>Clear</Text></Pressable>} />
 
       <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
         {shown.map(sec => {
@@ -116,22 +105,19 @@ export default function FindingsBuilder({ title, sections, field, posWord, negWo
           </Pressable>
         )}
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const st = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: S.sm, paddingHorizontal: S.md, paddingRight: S.lg, marginBottom: S.md },
-  iconBtn:{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   content:{ paddingHorizontal: S.lg, paddingBottom: 60, gap: S.sm },
   card:   { backgroundColor: C.surface, borderRadius: R.md, borderWidth: 0.5, borderColor: C.line, padding: S.md },
   secHead:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: S.sm, minHeight: 20 },
   allBtn: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: R.pill, backgroundColor: C.okBg },
   chips:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip:   { paddingHorizontal: 10, paddingVertical: 6, borderRadius: R.pill, borderWidth: 0.5, borderColor: C.line, backgroundColor: C.bg },
-  neg:    { backgroundColor: C.okBg, borderColor: '#BFDCCB' },
-  pos:    { backgroundColor: C.highBg, borderColor: '#EDC2BD' },
+  neg:    { backgroundColor: C.okBg, borderColor: C.okLine },
+  pos:    { backgroundColor: C.highBg, borderColor: C.highLine },
   chipText: { ...T.small, color: C.ink2 },
   sensitive: { alignSelf: 'center', padding: S.md },
 });

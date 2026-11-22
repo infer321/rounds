@@ -16,7 +16,8 @@ import { tap, thud } from '../utils/haptics';
 import Sheet, { Btn } from '../components/Sheet';
 import Icon from '../components/Icon';
 import TabBar from '../components/TabBar';
-import { PatientDetailsFields } from './PatientScreen';
+import PatientForm, { usePatientDraft } from '../components/PatientForm';
+import { EmptyState } from '../components/ui';
 import { C, T, R, S } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -31,7 +32,7 @@ function PatientCard({ p, now, onPress, onLongPress }: { p: Patient; now: number
   const as = ageSex(p.age, p.gender);
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={450}
-      style={({ pressed }) => [st.card, overdue && st.cardHot, pressed && { transform: [{ scale: 0.985 }], backgroundColor: '#FBFBF9' }]}>
+      style={({ pressed }) => [st.card, overdue && st.cardHot, pressed && { transform: [{ scale: 0.985 }], backgroundColor: C.bg }]}>
       <View style={st.cardHead}>
         <Text style={st.initials}>{p.initials}</Text>
         {!!as && <Text style={st.as}>{as}</Text>}
@@ -64,10 +65,7 @@ export default function HomeScreen() {
   const now = useNow();
 
   const [adding, setAdding] = useState(false);
-  const [initials, setInitials] = useState('');
-  const [age, setAge] = useState('');
-  const [sex, setSex] = useState('');
-  const [desc, setDesc] = useState('');
+  const form = usePatientDraft();
   const [actionFor, setActionFor] = useState<Patient | null>(null);
 
   const allItems = patients.flatMap(p => p.items);
@@ -81,11 +79,11 @@ export default function HomeScreen() {
 
   const empties = Math.max(0, settings.slotCount - patients.length);
 
-  function openAdd() { setInitials(''); setAge(''); setSex(''); setDesc(''); setAdding(true); }
+  function openAdd() { form.reset(); setAdding(true); }
   function add() {
-    if (!initials.trim()) return;
+    if (!form.valid) return;
     thud();
-    const id = addPatient({ initials, age, gender: sex, descriptor: desc });
+    const id = addPatient(form.draft);
     setAdding(false);
     navigation.navigate('Patient', { patientId: id });
   }
@@ -117,13 +115,9 @@ export default function HomeScreen() {
       )}
 
       {patients.length === 0 ? (
-        <View style={st.empty}>
-          <Text style={T.h2}>No patients yet</Text>
-          <Text style={[T.small, { textAlign: 'center', marginTop: 6, lineHeight: 20 }]}>
-            Add each patient by initials, age and a one-liner.{'\n'}Everything stays encrypted on this phone.
-          </Text>
-          <View style={{ alignSelf: 'stretch', marginTop: S.xl }}><Btn label="Add patient" onPress={openAdd} /></View>
-        </View>
+        <EmptyState title="No patients yet"
+          body={'Add each patient by initials, age and a one-liner.\nEverything stays encrypted on this phone.'}
+          action={<Btn label="Add patient" onPress={openAdd} />} />
       ) : (
         <ScrollView contentContainerStyle={st.grid} showsVerticalScrollIndicator={false}>
           {patients.map(p => (
@@ -142,8 +136,8 @@ export default function HomeScreen() {
       <TabBar active="patients" />
 
       <Sheet visible={adding} onClose={() => setAdding(false)} title="New patient"
-        footer={<><Btn label="Cancel" kind="secondary" onPress={() => setAdding(false)} /><Btn label="Add patient" onPress={add} disabled={!initials.trim()} flex={2} /></>}>
-        <PatientDetailsFields {...{ initials, setInitials, age, setAge, sex, setSex, desc, setDesc }} onSubmit={add} autoFocus />
+        footer={<><Btn label="Cancel" kind="secondary" onPress={() => setAdding(false)} /><Btn label="Add patient" onPress={add} disabled={!form.valid} flex={2} /></>}>
+        <PatientForm draft={form.draft} set={form.set} onSubmit={add} autoFocus />
       </Sheet>
 
       <Sheet visible={!!actionFor} onClose={() => setActionFor(null)} title={actionFor?.initials ?? ''}
@@ -178,5 +172,4 @@ const st = StyleSheet.create({
   itemTime: { ...T.caption, ...T.num, color: C.ink3 },
   more: { ...T.caption, color: C.ink4, fontWeight: '400' },
   slot: { width: '48.4%', minHeight: 138, borderRadius: R.lg, borderWidth: 1, borderStyle: 'dashed', borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: S.xxl, paddingBottom: 80 },
 });

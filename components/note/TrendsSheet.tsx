@@ -8,7 +8,7 @@ import { HAndP } from '../../data/patients';
 import { LAB_LABEL, LAB_ORDER, LabKey, labFlag } from '../../utils/clinical';
 import { flagColor } from '../LabFishbone';
 import Icon from '../Icon';
-import { C, T, R, S } from '../../theme';
+import { C, T, S } from '../../theme';
 
 type Row = { key: string; label: string; values: (string | undefined)[]; flag: (v?: string) => 'H' | 'L' | null };
 

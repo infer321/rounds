@@ -27,6 +27,19 @@ export const C = {
   flag:      '#A86410',  // signout flag
   flagBg:    '#FBF1E2',
   timer:     '#17181B',
+  shadow:    '#000000',
+
+  // Faded flag colors (yesterday's values) and chip borders
+  highFaded: '#D9A19C',
+  lowFaded:  '#97B4D6',
+  highLine:  '#EDC2BD',
+  okLine:    '#BFDCCB',
+
+  // Keyboard toolbar: matches the iOS system keyboard
+  kbBar:     '#D3D5DA',
+  kbChipBar: '#E8EBEF',
+  kbLine:    '#C0C5CC',
+  kbKeyLine: '#C5C9D0',
 };
 
 export const T = {

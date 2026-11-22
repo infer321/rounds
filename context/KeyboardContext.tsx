@@ -69,7 +69,7 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
     setExtraKeysState(prev => (prev.join('\u0000') === keys.join('\u0000') ? prev : keys));
   }, []);
 
-  const actions = useMemo(() => ({ registerInsert, doInsert, setSuggestions, setExtraKeys }), []);
+  const actions = useMemo(() => ({ registerInsert, doInsert, setSuggestions, setExtraKeys }), [registerInsert, doInsert, setSuggestions, setExtraKeys]);
   const state = useMemo(() => ({ suggestions, extraKeys, toolbarActive }), [suggestions, extraKeys, toolbarActive]);
 
   return (

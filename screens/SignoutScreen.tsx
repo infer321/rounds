@@ -4,9 +4,6 @@
  * handed off (it is NOT deleted, which the old version did).
  */
 import { StyleSheet, Text, View, ScrollView, Pressable } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { usePatients } from '../context/PatientsContext';
 import { useToast } from '../context/ToastContext';
@@ -15,11 +12,10 @@ import { buildSignout, oneLiner } from '../utils/noteExport';
 import { formatCountdown } from '../utils/time';
 import { tap, success } from '../utils/haptics';
 import Icon from '../components/Icon';
+import { Screen, ScreenHeader, EmptyState } from '../components/ui';
 import { C, T, R, S } from '../theme';
 
 export default function SignoutScreen() {
-  const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   const { patients, toggleHandedOff, toggleSignout } = usePatients();
   const toast = useToast();
   const now = useNow(15_000);
@@ -35,29 +31,17 @@ export default function SignoutScreen() {
   }
 
   return (
-    <View style={[st.screen, { paddingTop: insets.top + S.sm }]}>
-      <StatusBar style="dark" />
-      <View style={st.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={st.iconBtn}><Icon name="back" size={22} /></Pressable>
-        <View style={{ flex: 1 }}>
-          <Text style={T.h2}>Signout</Text>
-          <Text style={T.caption}>{total ? `${done}/${total} handed off` : 'Nothing flagged'}</Text>
-        </View>
-        {total > 0 && (
+    <Screen>
+      <ScreenHeader title="Signout" subtitle={total ? `${done}/${total} handed off` : 'Nothing flagged'}
+        right={total > 0 && (
           <Pressable onPress={copy} style={({ pressed }) => [st.copy, pressed && { opacity: 0.85 }]}>
             <Icon name="copy" size={16} color="#fff" strokeWidth={2} />
             <Text style={[T.bodyM, { color: '#fff', fontSize: 14 }]}>Copy</Text>
           </Pressable>
-        )}
-      </View>
+        )} />
 
       {total === 0 ? (
-        <View style={st.empty}>
-          <Text style={T.h2}>No signout items</Text>
-          <Text style={[T.small, { textAlign: 'center', marginTop: 6, lineHeight: 20 }]}>
-            Tap the flag on any timer or task to add it here.
-          </Text>
-        </View>
+        <EmptyState title="No signout items" body="Tap the flag on any timer or task to add it here." />
       ) : (
         <ScrollView contentContainerStyle={st.list} showsVerticalScrollIndicator={false}>
           {groups.map(({ p, items }) => (
@@ -86,14 +70,11 @@ export default function SignoutScreen() {
           <Text style={st.hint}>Tap to check off. Long-press to remove from signout.</Text>
         </ScrollView>
       )}
-    </View>
+    </Screen>
   );
 }
 
 const st = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: S.sm, paddingHorizontal: S.md, marginBottom: S.lg },
-  iconBtn:{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   copy:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.ink, borderRadius: R.pill, paddingHorizontal: 14, paddingVertical: 8 },
   list:   { paddingHorizontal: S.lg, gap: S.md, paddingBottom: 60 },
   group:  { backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 0.5, borderColor: C.line, overflow: 'hidden' },
@@ -105,5 +86,4 @@ const st = StyleSheet.create({
   struck: { color: C.ink3, textDecorationLine: 'line-through' },
   due:    { ...T.caption, ...T.num },
   hint:   { ...T.caption, color: C.ink4, textAlign: 'center' },
-  empty:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: S.xxl, paddingBottom: 80 },
 });

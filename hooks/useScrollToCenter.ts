@@ -11,8 +11,10 @@
  * zero per-input wiring.
  */
 import { useRef, useEffect } from 'react';
-import { Dimensions, Keyboard, Platform, ScrollView, TextInput } from 'react-native';
+import { Dimensions, Keyboard, KeyboardEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, TextInput } from 'react-native';
 import { TOOLBAR_HEIGHT } from '../components/KeyboardAccessory';
+
+type Measurable = { measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void };
 
 export function useScrollToCenter() {
   const scrollRef   = useRef<ScrollView>(null);
@@ -22,7 +24,7 @@ export function useScrollToCenter() {
   // ── Core scroll calculation ──────────────────────────────────────────────
 
   function doCenter(
-    node: { measureInWindow: Function } | null | undefined,
+    node: Measurable | null | undefined,
     kbH: number,
     hasToolbar: boolean,
   ) {
@@ -51,13 +53,13 @@ export function useScrollToCenter() {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const onShow = Keyboard.addListener(showEvt as any, (e: any) => {
+    const onShow = Keyboard.addListener(showEvt, (e: KeyboardEvent) => {
       const kbH = e.endCoordinates.height;
       kbHeightRef.current = kbH;
 
       setTimeout(() => {
         // TextInput.State.currentlyFocusedInput() returns the focused node
-        const focused = (TextInput.State as any).currentlyFocusedInput?.();
+        const focused = TextInput.State.currentlyFocusedInput?.() as unknown as Measurable | null;
         if (!focused) return;
 
         // Toolbar shows only for text (non-numeric) keyboards. Detect by
@@ -68,7 +70,7 @@ export function useScrollToCenter() {
       }, 320); // wait for keyboard animation to settle
     });
 
-    const onHide = Keyboard.addListener(hideEvt as any, () => {
+    const onHide = Keyboard.addListener(hideEvt, () => {
       kbHeightRef.current = 0;
     });
 
@@ -79,7 +81,7 @@ export function useScrollToCenter() {
   // Call when keyboard is already showing and you need to re-center
   // (e.g. APInput new-line, or switching fields with same keyboard type).
 
-  function centerInput(node: { measureInWindow: Function } | null | undefined) {
+  function centerInput(node: Measurable | null | undefined) {
     if (!node) return;
     const kbH = kbHeightRef.current;
     setTimeout(() => {
@@ -91,7 +93,7 @@ export function useScrollToCenter() {
     scrollRef,
     centerInput,
     scrollProps: {
-      onScroll: (e: any) => { scrollY.current = e.nativeEvent.contentOffset.y; },
+      onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => { scrollY.current = e.nativeEvent.contentOffset.y; },
       scrollEventThrottle: 16 as const,
     },
   };

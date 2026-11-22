@@ -4,12 +4,12 @@ import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Vitals } from '../../data/patients';
 import { NUMERIC_RE, VitKey, vitFlag } from '../../utils/clinical';
 import { flagColor } from '../LabFishbone';
-import { tap } from '../../utils/haptics';
+import { Segmented } from '../ui';
 import { C, T, R, S } from '../../theme';
 
 const ORDER: VitKey[] = ['temp', 'hr', 'rr', 'bpS', 'bpD', 'spo2'];
 const MAXLEN: Record<VitKey, number> = { temp: 4, hr: 3, rr: 2, bpS: 3, bpD: 3, spo2: 3 };
-const O2_MODES = ['RA', 'NC', 'BiPAP'] as const;
+const O2_MODES = [['RA', 'RA'], ['NC', 'NC'], ['BiPAP', 'BiPAP']] as const;
 
 type Props = { vitals: Vitals; prev: Vitals; onChange: (p: Partial<Vitals>) => void };
 
@@ -77,17 +77,8 @@ function VitalsBlock({ vitals: v, prev: pv, onChange }: Props) {
         <View style={[st.cell, { flex: 2.8, alignItems: 'flex-start', paddingLeft: S.sm }]}>
           <Text style={st.label}>O₂ support</Text>
           <View style={st.o2}>
-            <View style={st.seg}>
-              {O2_MODES.map(m => {
-                const on = v.o2Mode === m;
-                return (
-                  <Pressable key={m} style={[st.segBtn, on && st.segOn]} hitSlop={4}
-                    onPress={() => { tap(); onChange({ o2Mode: on ? undefined : m, o2Val: m === 'RA' || on ? undefined : v.o2Val }); }}>
-                    <Text style={[st.segText, on && st.segTextOn]}>{m}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Segmented options={O2_MODES} value={v.o2Mode} size="sm" allowNone
+              onChange={m => onChange({ o2Mode: m, o2Val: m === 'NC' || m === 'BiPAP' ? v.o2Val : undefined })} />
             {(v.o2Mode === 'NC' || v.o2Mode === 'BiPAP') && (
               <TextInput
                 style={st.o2Val}
@@ -121,11 +112,6 @@ const st = StyleSheet.create({
   bpHalf:{ flex: 1, flexDirection: 'row', alignItems: 'center' },
   slash: { fontSize: 18, color: C.ink4 },
   o2:    { flexDirection: 'row', alignItems: 'center', gap: S.sm, minHeight: 34 },
-  seg:   { flexDirection: 'row', backgroundColor: C.sunken, borderRadius: R.sm, padding: 2 },
-  segBtn:{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  segOn: { backgroundColor: C.surface, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
-  segText: { ...T.caption, color: C.ink2 },
-  segTextOn: { color: C.ink, fontWeight: '600' },
   o2Val: { ...T.bodyM, ...T.num, borderBottomWidth: 1, borderBottomColor: C.line, minWidth: 64, paddingVertical: 4 },
 });
 

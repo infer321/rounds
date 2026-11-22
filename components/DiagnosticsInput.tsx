@@ -12,9 +12,12 @@ import { memoData } from '../utils/memo';
  */
 
 import { useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { ImagingStudy } from '../data/patients';
 import { uid } from '../utils/id';
+import { useBufferedText } from '../hooks/useBufferedText';
+import { useToast } from '../context/ToastContext';
+import Icon from './Icon';
 import { C } from '../theme';
 
 // ── Imaging data ───────────────────────────────────────────────────────────
@@ -100,6 +103,56 @@ const BORDER = C.line;
 const BG     = C.surface;
 const MAX_PILLS = 12;
 
+// ── Pure helpers ───────────────────────────────────────────────────────────
+
+const PLACEHOLDER: Record<Phase, string> = {
+  modality:   'Add study (XR, CT, MRI, US)…',
+  bodyPart:   'Body region…',
+  laterality: 'Laterality…',
+  findings:   'Findings…',
+};
+
+/** Suggestion pills for the current phase. */
+function pillsFor(phase: Phase, text: string): string[] {
+  if (phase === 'modality') {
+    return MODALITY_DEFS.filter(m => fuzzyMatch(text, m.label) || fuzzyMatch(text, m.search)).map(m => m.label);
+  }
+  if (phase === 'bodyPart') {
+    const pool = text ? BODY_PARTS.filter(b => fuzzyMatch(text, b.label) || fuzzyMatch(text, b.search)) : BODY_PARTS;
+    return pool.slice(0, MAX_PILLS).map(b => b.label);
+  }
+  if (phase === 'laterality') return LATERALITY.filter(l => fuzzyMatch(text, l));
+  return [];
+}
+
+/** Locked text shown before the cursor, e.g. "CT Chest, Left: ". */
+function prefixFor(phase: Phase, d: Draft): string {
+  if (phase === 'bodyPart')   return `${d.modality} `;
+  if (phase === 'laterality') return `${d.modality} ${d.bodyPart?.label}, `;
+  if (phase === 'findings')   return `${d.modality} ${d.bodyPart?.label}${d.laterality ? `, ${d.laterality}` : ''}: `;
+  return '';
+}
+
+// ── Committed study row (buffered typing, like other note fields) ──────────
+
+function StudyRow({ study, onFindings, onRemove }: { study: ImagingStudy; onFindings: (v: string) => void; onRemove: () => void }) {
+  const buf = useBufferedText(study.findings, onFindings);
+  const where = [study.bodyPart, study.laterality].filter(Boolean).join(', ');
+  return (
+    <View style={st.studyRow}>
+      <View style={st.studyBody}>
+        <Text style={st.studyLabel}>{study.modality} {where}</Text>
+        <TextInput style={st.studyFindings} value={buf.text} onChangeText={buf.setText}
+          onFocus={buf.onFocus} onBlur={buf.onBlur}
+          multiline placeholder="pending…" placeholderTextColor={C.ink4} textAlignVertical="top" />
+      </View>
+      <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel={`Remove ${study.modality} ${where}`}>
+        <Icon name="close" size={16} color={C.ink4} />
+      </Pressable>
+    </View>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 function DiagnosticsInput({ studies, onChange }: Props) {
@@ -107,43 +160,10 @@ function DiagnosticsInput({ studies, onChange }: Props) {
   const [text,  setText]  = useState('');
   const [draft, setDraft] = useState<Draft>({ modality: '', bodyPart: null, laterality: '' });
   const inputRef = useRef<TextInput>(null);
+  const toast = useToast();
 
-  // ── Suggestions ────────────────────────────────────────────────────────
-  const suggestions: string[] = (() => {
-    if (phase === 'modality') {
-      return MODALITY_DEFS
-        .filter(m => fuzzyMatch(text, m.label) || fuzzyMatch(text, m.search))
-        .map(m => m.label);
-    }
-    if (phase === 'bodyPart') {
-      const pool = text
-        ? BODY_PARTS.filter(b => fuzzyMatch(text, b.label) || fuzzyMatch(text, b.search))
-        : BODY_PARTS.slice(0, MAX_PILLS);
-      return pool.slice(0, MAX_PILLS).map(b => b.label);
-    }
-    if (phase === 'laterality') {
-      return LATERALITY.filter(l => fuzzyMatch(text, l));
-    }
-    return [];
-  })();
-
-  // ── Prefix text (locked portion before the active cursor) ─────────────
-  const prefix: string = (() => {
-    if (phase === 'bodyPart')   return `${draft.modality} `;
-    if (phase === 'laterality') return `${draft.modality} ${draft.bodyPart?.label}, `;
-    if (phase === 'findings') {
-      const lat = draft.laterality ? `, ${draft.laterality}` : '';
-      return `${draft.modality} ${draft.bodyPart?.label}${lat}: `;
-    }
-    return '';
-  })();
-
-  const phrasePlaceholder: Record<Phase, string> = {
-    modality:   'Add study (XR, CT, MRI, US)…',
-    bodyPart:   'Body region…',
-    laterality: 'Laterality…',
-    findings:   'Findings…',
-  };
+  const suggestions = pillsFor(phase, text);
+  const prefix = prefixFor(phase, draft);
 
   // ── Selection ──────────────────────────────────────────────────────────
   function selectSuggestion(label: string) {
@@ -165,8 +185,8 @@ function DiagnosticsInput({ studies, onChange }: Props) {
     setTimeout(() => inputRef.current?.focus(), 30);
   }
 
-  // ── Commit findings → lock in study ────────────────────────────────────
-  function commit() {
+  // ── Commit findings → lock in study (optionally start the next one) ─
+  function commit(nextModality?: string) {
     if (!draft.modality || !draft.bodyPart) return;
     onChange([...studies, {
       id: uid(),
@@ -175,26 +195,18 @@ function DiagnosticsInput({ studies, onChange }: Props) {
       laterality: draft.laterality || undefined,
       findings: text.trim(),
     }]);
-    setDraft({ modality: '', bodyPart: null, laterality: '' });
+    setDraft({ modality: nextModality ?? '', bodyPart: null, laterality: '' });
     setText('');
-    setPhase('modality');
+    setPhase(nextModality ? 'bodyPart' : 'modality');
     setTimeout(() => inputRef.current?.focus(), 30);
   }
 
-  // ── Commit findings then immediately start next study ─────────────────
-  function commitAndStartNext(modality: string) {
-    if (!draft.modality || !draft.bodyPart) return;
-    onChange([...studies, {
-      id: uid(),
-      modality: draft.modality,
-      bodyPart: draft.bodyPart.label,
-      laterality: draft.laterality || undefined,
-      findings: text.trim(),
-    }]);
-    setDraft({ modality, bodyPart: null, laterality: '' });
-    setText('');
-    setPhase('bodyPart');
-    setTimeout(() => inputRef.current?.focus(), 30);
+  function remove(study: ImagingStudy) {
+    const idx = studies.findIndex(x => x.id === study.id);
+    onChange(studies.filter(x => x.id !== study.id));
+    toast({ message: `Removed ${study.modality} ${study.bodyPart}`, onUndo: () => {
+      const next = studies.filter(x => x.id !== study.id); next.splice(idx, 0, study); onChange(next);
+    } });
   }
 
   // ── Enter key ──────────────────────────────────────────────────────────
@@ -227,35 +239,11 @@ function DiagnosticsInput({ studies, onChange }: Props) {
   return (
     <View style={st.container}>
 
-      {/* ── Committed studies ──────────────────────────────────── */}
-      {studies.map(study => {
-        const lat   = study.laterality ? `, ${study.laterality}` : '';
-        const label = `${study.modality} ${study.bodyPart}${lat}`;
-        return (
-          <View key={study.id} style={st.studyRow}>
-            <View style={st.studyBody}>
-              <Text style={st.studyLabel}>{label}</Text>
-              <TextInput
-                style={st.studyFindings}
-                value={study.findings}
-                onChangeText={v =>
-                  onChange(studies.map(s => s.id === study.id ? { ...s, findings: v } : s))
-                }
-                multiline
-                placeholder="pending…"
-                placeholderTextColor={C.ink4}
-                textAlignVertical="top"
-              />
-            </View>
-            <TouchableOpacity
-              onPress={() => onChange(studies.filter(s => s.id !== study.id))}
-              hitSlop={{ top: 8, bottom: 8, left: 10, right: 10 }}
-            >
-              <Text style={st.deleteX}>×</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      })}
+      {studies.map(study => (
+        <StudyRow key={study.id} study={study}
+          onFindings={v => onChange(studies.map(x => x.id === study.id ? { ...x, findings: v } : x))}
+          onRemove={() => remove(study)} />
+      ))}
 
       {/* ── Active input area ──────────────────────────────────── */}
       <View style={st.activeArea}>
@@ -271,9 +259,9 @@ function DiagnosticsInput({ studies, onChange }: Props) {
             onSubmitEditing={handleSubmit}
             onKeyPress={handleKeyPress}
             returnKeyType={phase === 'findings' ? 'done' : 'next'}
-            placeholder={phrasePlaceholder[phase]}
+            placeholder={PLACEHOLDER[phase]}
             placeholderTextColor={C.ink4}
-            blurOnSubmit={false}
+            submitBehavior="submit"
             autoCorrect={phase === 'findings'}
             autoCapitalize={phase === 'findings' ? 'sentences' : 'none'}
             autoComplete="off"
@@ -284,13 +272,13 @@ function DiagnosticsInput({ studies, onChange }: Props) {
         {suggestions.length > 0 && (
           <View style={st.pills}>
             {suggestions.map((s, i) => (
-              <TouchableOpacity
+              <Pressable
                 key={s}
-                style={[st.pill, i === 0 && st.pillPrimary]}
+                style={({ pressed }) => [st.pill, i === 0 && st.pillPrimary, pressed && { opacity: 0.7 }]}
                 onPress={() => selectSuggestion(s)}
               >
                 <Text style={[st.pillText, i === 0 && st.pillPrimaryText]}>{s}</Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
         )}
@@ -300,13 +288,13 @@ function DiagnosticsInput({ studies, onChange }: Props) {
           <View style={st.nextRow}>
             <Text style={st.nextLabel}>Next</Text>
             {MODALITY_DEFS.map(m => (
-              <TouchableOpacity
+              <Pressable
                 key={m.label}
-                style={st.nextPill}
-                onPress={() => commitAndStartNext(m.label)}
+                style={({ pressed }) => [st.nextPill, pressed && { opacity: 0.7 }]}
+                onPress={() => commit(m.label)}
               >
                 <Text style={st.nextPillText}>{m.label}</Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
         )}
@@ -351,12 +339,6 @@ const st = StyleSheet.create({
     color: C.ink,
     paddingVertical: 0,
     lineHeight: 18,
-  },
-  deleteX: {
-    fontSize: 20,
-    color: C.ink4,
-    lineHeight: 22,
-    marginTop: 1,
   },
 
   // Active input area

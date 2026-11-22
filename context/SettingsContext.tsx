@@ -63,7 +63,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (rawS) Object.assign(next, JSON.parse(rawS));
         setSettings(next);
         if (rawP) setCustom(JSON.parse(rawP));
-      } catch {}
+      } catch {
+        // Corrupt settings: fall back to defaults rather than block launch
+      }
       setReady(true);
     })();
   }, []);

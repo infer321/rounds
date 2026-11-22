@@ -34,7 +34,7 @@ function Column({ items, selected, onChange, label }: { items: number[]; selecte
     setLive(items[idx]);
     const t = setTimeout(() => ref.current?.scrollTo({ y: idx * ITEM_H, animated: false }), 30);
     return () => clearTimeout(t);
-  }, [selected]);
+  }, [selected, items]);
 
   const idxAt = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
     Math.max(0, Math.min(items.length - 1, Math.round(e.nativeEvent.contentOffset.y / ITEM_H)));
