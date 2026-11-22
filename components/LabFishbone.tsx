@@ -1,3 +1,4 @@
+import { memoData } from '../utils/memo';
 /**
  * Lab entry diagrams. Values color red (high) / blue (low); yesterday's value
  * sits faded above each cell. Return key walks LAB_ORDER across all panels.
@@ -73,7 +74,7 @@ const abs = (left: number, top: number, width: number, height: number) => ({ pos
 //   \   Hgb   /
 //  WBC ───── Plt
 //   /   Hct   \
-export function CBCFishbone(props: FishProps) {
+function CBCFishboneBase(props: FishProps) {
   const { w, onLayout } = useWidth();
   const cx1 = w * 0.3, cx2 = w * 0.7, cy = H / 2, inset = w * 0.05;
   const c = cellFactory(props);
@@ -99,7 +100,7 @@ export function CBCFishbone(props: FishProps) {
 //  Na | Cl | BUN \
 //  ───────────────  Glu
 //  K  | CO2| Cr  /
-export function BMPFishbone(props: FishProps) {
+function BMPFishboneBase(props: FishProps) {
   const { w, onLayout } = useWidth();
   const cy = H / 2, v1 = w * 0.25, v2 = w * 0.5, tail = w * 0.75, out = w * 0.95;
   const c = cellFactory(props);
@@ -128,7 +129,7 @@ export function BMPFishbone(props: FishProps) {
 //  Ca | TP | AST | LDH \
 //  ──────────────────── Tbili
 //  Phos| Alb| ALT | ALP /
-export function LFTFishbone(props: FishProps) {
+function LFTFishboneBase(props: FishProps) {
   const { w, onLayout } = useWidth();
   const cy = H / 2, v1 = w * 0.2, v2 = w * 0.4, v3 = w * 0.6, tail = w * 0.8, out = w * 0.96;
   const c = cellFactory(props);
@@ -156,7 +157,7 @@ export function LFTFishbone(props: FishProps) {
 }
 
 /** Plain row of cells (Mg + coags). */
-export function LabRow(props: FishProps & { keys: LabKey[] }) {
+function LabRowBase(props: FishProps & { keys: LabKey[] }) {
   const c = cellFactory(props, props.keys[props.keys.length - 1]);
   return (
     <View style={[st.box, st.row]}>
@@ -177,3 +178,7 @@ const st = StyleSheet.create({
   input:{ fontSize: 17, fontWeight: '600', ...T.num, minWidth: 44, paddingVertical: 2 },
   unitLabel: { fontSize: 9, fontWeight: '600', color: C.ink4, letterSpacing: 0.3, height: 12 },
 });
+export const CBCFishbone = memoData(CBCFishboneBase);
+export const BMPFishbone = memoData(BMPFishboneBase);
+export const LFTFishbone = memoData(LFTFishboneBase);
+export const LabRow = memoData(LabRowBase);

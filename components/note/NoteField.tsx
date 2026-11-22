@@ -1,3 +1,4 @@
+import { memoData } from '../../utils/memo';
 import { useRef } from 'react';
 import { TextInput, StyleSheet } from 'react-native';
 import { useBufferedText } from '../../hooks/useBufferedText';
@@ -14,7 +15,7 @@ type Props = {
 };
 
 /** Multiline note field: buffered typing + number toolbar + auto-centering. */
-export default function NoteField({ value, onCommit, placeholder, onFocused, minHeight = 88, bare }: Props) {
+function NoteField({ value, onCommit, placeholder, onFocused, minHeight = 88, bare }: Props) {
   const ref = useRef<TextInput>(null);
   const buf = useBufferedText(value, onCommit);
   const tb = useNoteToolbar(buf.text, buf.setText, ref);
@@ -40,3 +41,5 @@ const st = StyleSheet.create({
   card: { ...T.body, lineHeight: 21, backgroundColor: C.surface, borderRadius: R.md, borderWidth: 0.5, borderColor: C.line, paddingHorizontal: S.md + 2, paddingTop: S.md, paddingBottom: S.md },
   bare: { ...T.small, color: C.ink, lineHeight: 19, paddingTop: S.sm, paddingHorizontal: 0 },
 });
+
+export default memoData(NoteField);

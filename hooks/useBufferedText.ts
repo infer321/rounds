@@ -4,8 +4,9 @@
  * whole patient tree (and the encrypted save) isn't re-run per keystroke.
  */
 import { useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
-export function useBufferedText(value: string, commit: (v: string) => void, delay = 300) {
+export function useBufferedText(value: string, commit: (v: string) => void, delay = 1000) {
   const [text, setText] = useState(value);
   const pending = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -21,6 +22,10 @@ export function useBufferedText(value: string, commit: (v: string) => void, dela
   // Accept outside changes (e.g. builder screens, Complete round) when idle
   useEffect(() => { if (!focused.current && pending.current === null) setText(value); }, [value]);
   useEffect(() => flush, []);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s !== 'active') flush(); });
+    return () => sub.remove();
+  }, []);
 
   return {
     text,

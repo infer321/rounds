@@ -29,6 +29,10 @@ import { C, T, R, S } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+// Stable empties so memoized blocks don't re-render on every keystroke
+const NO_LABS: Labs = {};
+const NO_VITALS: Vitals = {};
+
 function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <View style={st.section}>
@@ -62,8 +66,8 @@ export default function NoteEditor({ patient, mode }: { patient: Patient; mode: 
 
   const pid = patient.id;
   const hp = patient.hp ?? {};
-  const labs = hp.labs ?? {};
-  const prevLabs = hp.prevLabs ?? {};
+  const labs = hp.labs ?? NO_LABS;
+  const prevLabs = hp.prevLabs ?? NO_LABS;
   const patch = (u: Parameters<typeof patchHP>[1]) => patchHP(pid, u);
   const pL = (k: LabKey, v: string) => patch(h => ({ ...h, labs: { ...h.labs, [k]: v } as Labs }));
   const pV = (v: Partial<Vitals>) => patch(h => ({ ...h, vitals: { ...h.vitals, ...v } }));
@@ -146,7 +150,7 @@ export default function NoteEditor({ patient, mode }: { patient: Patient; mode: 
         )}
 
         <Section title="Vitals" action={<SmallBtn label="Advance" onPress={() => advance('vitals')} disabled={!vitalsHasData(hp.vitals)} />}>
-          <VitalsBlock vitals={hp.vitals ?? {}} prev={hp.prevVitals ?? {}} onChange={pV} />
+          <VitalsBlock vitals={hp.vitals ?? NO_VITALS} prev={hp.prevVitals ?? NO_VITALS} onChange={pV} />
         </Section>
 
         <Section title="Physical exam">

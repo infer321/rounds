@@ -1,3 +1,4 @@
+import { memoData } from '../../utils/memo';
 import { useRef } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Vitals } from '../../data/patients';
@@ -12,7 +13,7 @@ const O2_MODES = ['RA', 'NC', 'BiPAP'] as const;
 
 type Props = { vitals: Vitals; prev: Vitals; onChange: (p: Partial<Vitals>) => void };
 
-export default function VitalsBlock({ vitals: v, prev: pv, onChange }: Props) {
+function VitalsBlock({ vitals: v, prev: pv, onChange }: Props) {
   const refs = useRef<Partial<Record<VitKey, TextInput | null>>>({});
   const next = (k: VitKey) => refs.current[ORDER[ORDER.indexOf(k) + 1]]?.focus();
 
@@ -127,3 +128,5 @@ const st = StyleSheet.create({
   segTextOn: { color: C.ink, fontWeight: '600' },
   o2Val: { ...T.bodyM, ...T.num, borderBottomWidth: 1, borderBottomColor: C.line, minWidth: 64, paddingVertical: 4 },
 });
+
+export default memoData(VitalsBlock);

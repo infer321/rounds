@@ -10,7 +10,7 @@
  *
  * The A/P input additionally calls setSuggestions() to populate the chip row.
  */
-import { createContext, useContext, useRef, useCallback, useState, ReactNode } from 'react';
+import { createContext, useContext, useRef, useCallback, useState, useMemo, ReactNode } from 'react';
 
 export type Suggestion = {
   label:        string;  // text shown in chip
@@ -32,15 +32,18 @@ interface KbCtxType {
   toolbarActive:  boolean;
 }
 
-const KbCtx = createContext<KbCtxType>({
-  registerInsert: () => {},
-  doInsert:       () => {},
-  suggestions:    [],
-  setSuggestions: () => {},
-  extraKeys:      [],
-  setExtraKeys:   () => {},
-  toolbarActive:  false,
+type KbActions = Pick<KbCtxType, 'registerInsert' | 'doInsert' | 'setSuggestions' | 'setExtraKeys'>;
+type KbState = Pick<KbCtxType, 'suggestions' | 'extraKeys' | 'toolbarActive'>;
+
+// Two contexts: text fields only need the (stable) actions, so changing the
+// suggestion chips re-renders the toolbar alone, not every field on screen.
+const KbActionsCtx = createContext<KbActions>({
+  registerInsert: () => {}, doInsert: () => {}, setSuggestions: () => {}, setExtraKeys: () => {},
 });
+const KbStateCtx = createContext<KbState>({ suggestions: [], extraKeys: [], toolbarActive: false });
+
+const sameSugg = (a: Suggestion[], b: Suggestion[]) =>
+  a.length === b.length && a.every((x, i) => x.label === b[i].label && x.insert === b[i].insert && x.replaceFrom === b[i].replaceFrom);
 
 export function KeyboardProvider({ children }: { children: ReactNode }) {
   const insertRef = useRef<InsertFn | null>(null);
@@ -51,7 +54,7 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
   const registerInsert = useCallback((fn: InsertFn | null) => {
     insertRef.current = fn;
     setToolbarActive(fn !== null);
-    if (fn === null) setSuggestionsState([]);   // auto-clear on blur
+    if (fn === null) setSuggestionsState(prev => (prev.length ? [] : prev));
   }, []);
 
   const doInsert = useCallback((s: string, replaceFrom?: number) => {
@@ -59,18 +62,22 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setSuggestions = useCallback((s: Suggestion[]) => {
-    setSuggestionsState(s);
+    setSuggestionsState(prev => (sameSugg(prev, s) ? prev : s));
   }, []);
 
   const setExtraKeys = useCallback((keys: string[]) => {
-    setExtraKeysState(keys);
+    setExtraKeysState(prev => (prev.join('\u0000') === keys.join('\u0000') ? prev : keys));
   }, []);
 
+  const actions = useMemo(() => ({ registerInsert, doInsert, setSuggestions, setExtraKeys }), []);
+  const state = useMemo(() => ({ suggestions, extraKeys, toolbarActive }), [suggestions, extraKeys, toolbarActive]);
+
   return (
-    <KbCtx.Provider value={{ registerInsert, doInsert, suggestions, setSuggestions, extraKeys, setExtraKeys, toolbarActive }}>
-      {children}
-    </KbCtx.Provider>
+    <KbActionsCtx.Provider value={actions}>
+      <KbStateCtx.Provider value={state}>{children}</KbStateCtx.Provider>
+    </KbActionsCtx.Provider>
   );
 }
 
-export const useKbCtx = () => useContext(KbCtx);
+export const useKbCtx = () => useContext(KbActionsCtx);
+export const useKbState = () => useContext(KbStateCtx);

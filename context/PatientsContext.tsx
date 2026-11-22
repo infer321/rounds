@@ -10,7 +10,7 @@ import { advanceHP } from '../utils/rounds';
 import { useSettings } from './SettingsContext';
 
 const STORAGE_KEY = '@rounds_patients';
-const SAVE_DEBOUNCE_MS = 400;
+const SAVE_DEBOUNCE_MS = 1500; // flushed immediately when the app backgrounds
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

@@ -1,3 +1,4 @@
+import { memoData } from '../utils/memo';
 /**
  * DiagnosticsInput
  *
@@ -101,7 +102,7 @@ const MAX_PILLS = 12;
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export default function DiagnosticsInput({ studies, onChange }: Props) {
+function DiagnosticsInput({ studies, onChange }: Props) {
   const [phase, setPhase] = useState<Phase>('modality');
   const [text,  setText]  = useState('');
   const [draft, setDraft] = useState<Draft>({ modality: '', bodyPart: null, laterality: '' });
@@ -443,3 +444,5 @@ const st = StyleSheet.create({
     color: C.ink3,
   },
 });
+
+export default memoData(DiagnosticsInput);

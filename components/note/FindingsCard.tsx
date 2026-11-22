@@ -1,3 +1,4 @@
+import { memoData } from '../../utils/memo';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Icon from '../Icon';
 import NoteField from './NoteField';
@@ -13,7 +14,7 @@ type Props = {
 };
 
 /** Read-only summary of a structured builder, rendered the way it will print. */
-export default function FindingsCard({ lines, emptyText, onOpen, note, onNote, notePlaceholder }: Props) {
+function FindingsCard({ lines, emptyText, onOpen, note, onNote, notePlaceholder }: Props) {
   return (
     <View style={st.card}>
       <Pressable onPress={onOpen} style={({ pressed }) => [st.head, pressed && { opacity: 0.6 }]}>
@@ -41,3 +42,5 @@ const st = StyleSheet.create({
   empty:{ ...T.small, color: C.ink3 },
   divider: { height: 0.5, backgroundColor: C.line, marginTop: S.md },
 });
+
+export default memoData(FindingsCard);

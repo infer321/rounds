@@ -19,7 +19,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, AppState,
 } from 'react-native';
 import { useKbCtx, Suggestion } from '../context/KeyboardContext';
 import { Labs, HAndP, Vitals } from '../data/patients';
@@ -160,9 +160,13 @@ export default function APInput({ value, onChange, hp, style, placeholder, onFoc
   const scheduleFlush = useCallback(() => {
     dirtyRef.current = true;
     if (flushTimer.current) clearTimeout(flushTimer.current);
-    flushTimer.current = setTimeout(flushNow, 350);
+    flushTimer.current = setTimeout(flushNow, 1200);
   }, [flushNow]);
   useEffect(() => flushNow, [flushNow]);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', st => { if (st !== 'active') flushNow(); });
+    return () => sub.remove();
+  }, [flushNow]);
 
   // Sync incoming prop when NOT focused (e.g., patient switch or initial load)
   useEffect(() => {

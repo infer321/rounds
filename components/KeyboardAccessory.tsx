@@ -11,7 +11,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   Keyboard, Platform, KeyboardEvent,
 } from 'react-native';
-import { useKbCtx } from '../context/KeyboardContext';
+import { useKbCtx, useKbState } from '../context/KeyboardContext';
 import { C } from '../theme';
 
 // kept as named export so other files don't need changes
@@ -21,7 +21,8 @@ const KEYS = ['1','2','3','4','5','6','7','8','9','0'];
 export const TOOLBAR_HEIGHT = 50; // total height of the number row bar
 
 export default function KeyboardAccessory() {
-  const { doInsert, suggestions, extraKeys, toolbarActive } = useKbCtx();
+  const { doInsert } = useKbCtx();
+  const { suggestions, extraKeys, toolbarActive } = useKbState();
   const [kbHeight, setKbHeight] = useState(0);
   const [visible,  setVisible]  = useState(false);
 
