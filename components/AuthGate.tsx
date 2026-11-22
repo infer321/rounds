@@ -1,130 +1,99 @@
 /**
- * AuthGate — wraps the entire app.
+ * AuthGate
  *
- * Requires the user to authenticate with Face ID / Touch ID / device passcode:
- *   • Every cold launch
- *   • Every time the app returns from the background
- *
- * If the device has no biometrics enrolled the system falls back to
- * the device passcode automatically (iOS behaviour).
+ * - Children stay mounted while locked. (Before, locking unmounted the whole
+ *   app: every trip to Epic/Teams dumped you back on Home and dropped any
+ *   unsaved typing.)
+ * - A privacy cover goes up the moment the app leaves the foreground, so the
+ *   app-switcher snapshot never shows patient data.
+ * - Re-auth only after the auto-lock window (Settings) has elapsed.
+ * - Devices with no passcode at all are let through instead of soft-locked.
  */
 import { useEffect, useRef, useState, ReactNode } from 'react';
-import {
-  View, Text, TouchableOpacity, AppState, AppStateStatus, StyleSheet,
-} from 'react-native';
+import { View, Text, Pressable, AppState, StyleSheet } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { StatusBar } from 'expo-status-bar';
+import { useSettings } from '../context/SettingsContext';
+import Icon from './Icon';
+import { C, T, R, S } from '../theme';
 
-type Props = { children: ReactNode };
+export default function AuthGate({ children }: { children: ReactNode }) {
+  const { settings } = useSettings();
+  const [locked, setLocked] = useState(true);
+  const [covered, setCovered] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const busy = useRef(false);
+  const leftAt = useRef<number | null>(null);
+  const lockMs = useRef(settings.autoLockMin * 60_000);
+  lockMs.current = settings.autoLockMin * 60_000;
 
-export default function AuthGate({ children }: Props) {
-  const [unlocked, setUnlocked]   = useState(false);
-  const [error, setError]         = useState(false);
-  const appState                  = useRef<AppStateStatus>(AppState.currentState);
-  const isAuthenticating          = useRef(false);   // prevent re-entrant calls
+  async function authenticate() {
+    if (busy.current) return;
+    busy.current = true;
+    setFailed(false);
+    try {
+      const level = await LocalAuthentication.getEnrolledLevelAsync();
+      if (level === LocalAuthentication.SecurityLevel.NONE) { setLocked(false); return; }
+      const r = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock Rounds',
+        fallbackLabel: 'Use passcode',
+        disableDeviceFallback: false,
+      });
+      if (r.success) setLocked(false); else setFailed(true);
+    } catch {
+      setFailed(true);
+    } finally {
+      busy.current = false;
+    }
+  }
 
-  // Auth on mount (cold launch)
-  useEffect(() => {
-    authenticate();
-  }, []);
+  useEffect(() => { authenticate(); }, []);
 
-  // Re-lock only when fully backgrounded; re-auth when returning from background.
-  // Important: iOS fires 'inactive' whenever a system sheet (Face ID, passcode)
-  // appears — ignoring that state prevents the infinite re-auth loop.
   useEffect(() => {
     const sub = AppState.addEventListener('change', next => {
-      if (next === 'background') {
-        // Fully backgrounded → lock
-        setUnlocked(false);
-      } else if (next === 'active' && appState.current === 'background') {
-        // Returned from background (not just from a system sheet) → re-auth
-        authenticate();
+      if (next === 'active') {
+        setCovered(false);
+        if (leftAt.current !== null && Date.now() - leftAt.current >= lockMs.current) {
+          setLocked(true);
+          authenticate();
+        }
+        leftAt.current = null;
+      } else if (next === 'background') {
+        setCovered(true);
+        if (leftAt.current === null) leftAt.current = Date.now();
+      } else {
+        // 'inactive': app switcher, Control Center, or our own Face ID sheet
+        if (!busy.current) setCovered(true);
       }
-      appState.current = next;
     });
     return () => sub.remove();
   }, []);
 
-  async function authenticate() {
-    if (isAuthenticating.current) return;   // don't stack calls
-    isAuthenticating.current = true;
-    setError(false);
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Unlock Rounds',
-        fallbackLabel: 'Use Passcode',
-        disableDeviceFallback: false,
-        cancelLabel: '',
-      });
-      if (result.success) {
-        setUnlocked(true);
-      } else {
-        setError(true);
-      }
-    } catch {
-      setError(true);
-    } finally {
-      isAuthenticating.current = false;
-    }
-  }
-
-  if (unlocked) return <>{children}</>;
-
   return (
-    <View style={s.screen}>
-      <StatusBar style="dark" />
-      <View style={s.lockIcon}>
-        <Text style={s.lockEmoji}>🔒</Text>
-      </View>
-      <Text style={s.appName}>Rounds</Text>
-      <Text style={s.subtitle}>Patient data is protected</Text>
-
-      {error && (
-        <Text style={s.errorMsg}>Authentication failed</Text>
+    <View style={{ flex: 1 }}>
+      {children}
+      {(locked || covered) && (
+        <View style={[StyleSheet.absoluteFill, st.cover]}>
+          <View style={st.badge}><Icon name="lock" size={26} /></View>
+          <Text style={st.name}>Rounds</Text>
+          {locked && !covered && (
+            <>
+              {failed && <Text style={st.err}>Not unlocked. Try again.</Text>}
+              <Pressable style={({ pressed }) => [st.btn, pressed && { opacity: 0.85 }]} onPress={authenticate}>
+                <Text style={st.btnText}>Unlock</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
       )}
-
-      <TouchableOpacity style={s.unlockBtn} onPress={authenticate} activeOpacity={0.8}>
-        <Text style={s.unlockBtnText}>Unlock with Face ID / Passcode</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 40,
-  },
-  lockIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 22,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0.5,
-    borderColor: '#E5E5EA',
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  lockEmoji:  { fontSize: 36 },
-  appName:    { fontSize: 28, fontWeight: '700', color: '#1C1C1E' },
-  subtitle:   { fontSize: 14, color: '#999', marginBottom: 24 },
-  errorMsg:   { fontSize: 13, color: '#E24B4A', marginBottom: 4 },
-  unlockBtn: {
-    backgroundColor: '#1C1C1E',
-    paddingHorizontal: 28,
-    paddingVertical: 15,
-    borderRadius: 16,
-    width: '100%',
-    alignItems: 'center',
-  },
-  unlockBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+const st = StyleSheet.create({
+  cover: { backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', gap: S.md, paddingHorizontal: 40, zIndex: 10000, elevation: 10000 },
+  badge: { width: 64, height: 64, borderRadius: R.lg, backgroundColor: C.surface, borderWidth: 0.5, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
+  name:  { ...T.h2, marginBottom: S.lg },
+  err:   { ...T.small, color: C.high },
+  btn:   { backgroundColor: C.ink, borderRadius: R.md, paddingVertical: 14, alignSelf: 'stretch', alignItems: 'center' },
+  btnText: { ...T.bodyM, color: '#fff' },
 });

@@ -1,110 +1,128 @@
-import {
-  StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert,
-} from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Switch } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { usePatients } from '../context/PatientsContext';
-import { useSlotCount } from '../hooks/useSlotCount';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../App';
+import { usePatients } from '../context/PatientsContext';
+import { useSettings } from '../context/SettingsContext';
+import { tap, warn } from '../utils/haptics';
+import Icon from '../components/Icon';
+import { C, T, R, S } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
+function Row({ title, sub, right, onPress, danger }: { title: string; sub?: string; right?: React.ReactNode; onPress?: () => void; danger?: boolean }) {
+  return (
+    <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [st.row, pressed && onPress && { backgroundColor: C.sunken }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[T.body, danger && { color: C.high }]}>{title}</Text>
+        {!!sub && <Text style={[T.caption, { marginTop: 2, fontWeight: '400' }]}>{sub}</Text>}
+      </View>
+      {right ?? (onPress ? <Icon name="chevron" size={18} color={C.ink4} /> : null)}
+    </Pressable>
+  );
+}
+
 export default function SettingsScreen() {
   const navigation = useNavigation<Nav>();
-  const { clearAll } = usePatients();
-  const { slotCount, setSlotCount } = useSlotCount();
+  const insets = useSafeAreaInsets();
+  const { clearAll, patients } = usePatients();
+  const { settings, update } = useSettings();
 
-  function handleClearAll() {
-    Alert.alert(
-      'Start New Shift',
-      'This will remove all patients and their items. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Clear All', style: 'destructive', onPress: () => { clearAll(); navigation.goBack(); } },
-      ]
-    );
+  function newShift() {
+    warn();
+    Alert.alert('Start new shift?', `Removes all ${patients.length} patients, notes and timers from this phone. This can't be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear all', style: 'destructive', onPress: () => { clearAll(); navigation.goBack(); } },
+    ]);
   }
 
-  return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
+  const step = (d: number) => {
+    const dis = d < 0 ? settings.slotCount <= 1 : settings.slotCount >= 16;
+    return (
+      <Pressable disabled={dis} onPress={() => { tap(); update({ slotCount: settings.slotCount + d }); }}
+        style={[st.step, dis && { opacity: 0.3 }]} hitSlop={6} accessibilityLabel={d < 0 ? 'Fewer slots' : 'More slots'}>
+        <Icon name={d < 0 ? 'minus' : 'plus'} size={14} strokeWidth={2.25} />
+      </Pressable>
+    );
+  };
+  const stepper = (
+    <View style={st.stepper}>
+      {step(-1)}
+      <Text style={st.stepVal}>{settings.slotCount}</Text>
+      {step(1)}
+    </View>
+  );
 
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backArrow}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Settings</Text>
+  return (
+    <View style={[st.screen, { paddingTop: insets.top + S.sm }]}>
+      <StatusBar style="dark" />
+      <View style={st.header}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={st.iconBtn}><Icon name="back" size={22} /></Pressable>
+        <Text style={T.h2}>Settings</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
+        <Text style={st.sec}>List</Text>
+        <View style={st.card}>
+          <Row title="Census slots" sub="Empty cards shown on the patient grid" right={stepper} />
+          <View style={st.div} />
+          <Row title="Timer presets" sub="Add, rename or remove one-tap timers" onPress={() => navigation.navigate('Presets')} />
+        </View>
 
-        {/* Patient Slots */}
-        <Text style={styles.sectionTitle}>Patient Slots</Text>
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <View>
-              <Text style={styles.rowLabel}>Slots on home screen</Text>
-              <Text style={styles.rowSub}>Min 1 · Max 16</Text>
-            </View>
-            <View style={styles.stepper}>
-              <TouchableOpacity style={[styles.stepBtn, slotCount <= 1 && styles.stepBtnDisabled]} onPress={() => setSlotCount(slotCount - 1)} disabled={slotCount <= 1}>
-                <Text style={styles.stepBtnText}>−</Text>
-              </TouchableOpacity>
-              <Text style={styles.stepValue}>{slotCount}</Text>
-              <TouchableOpacity style={[styles.stepBtn, slotCount >= 16 && styles.stepBtnDisabled]} onPress={() => setSlotCount(slotCount + 1)} disabled={slotCount >= 16}>
-                <Text style={styles.stepBtnText}>+</Text>
-              </TouchableOpacity>
+        <Text style={st.sec}>Privacy</Text>
+        <View style={st.card}>
+          <View style={st.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={T.body}>Auto-lock</Text>
+              <Text style={[T.caption, { marginTop: 2, fontWeight: '400' }]}>Require Face ID after leaving the app for</Text>
             </View>
           </View>
-        </View>
-
-        {/* Timer Presets */}
-        <Text style={styles.sectionTitle}>Timer Presets</Text>
-        <View style={styles.card}>
-          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Presets')}>
-            <View>
-              <Text style={styles.rowLabel}>Change Timer Presets</Text>
-              <Text style={styles.rowSub}>Add, edit, or remove presets</Text>
+          <View style={st.segWrap}>
+            <View style={st.seg}>
+              {[[0, 'Immediately'], [1, '1 min'], [5, '5 min']].map(([v, l]) => {
+                const on = settings.autoLockMin === v;
+                return (
+                  <Pressable key={v} style={[st.segBtn, on && st.segOn]} onPress={() => { tap(); update({ autoLockMin: v as number }); }}>
+                    <Text style={[T.small, { color: on ? C.ink : C.ink3, fontWeight: on ? '600' : '400' }]}>{l}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <Text style={styles.rowArrow}>›</Text>
-          </TouchableOpacity>
+          </View>
+          <View style={st.div} />
+          <Row title="Initials in notifications" sub="Off: lock screen shows only the timer label"
+            right={<Switch value={settings.notifShowInitials} onValueChange={v => update({ notifShowInitials: v })} trackColor={{ true: C.ink }} />} />
         </View>
+        <Text style={st.foot}>
+          Patient data is AES-256 encrypted on this phone. The key lives in the device keychain and is never synced or uploaded. The app has no server.
+        </Text>
 
-        {/* Shift */}
-        <Text style={styles.sectionTitle}>Shift</Text>
-        <View style={styles.card}>
-          <TouchableOpacity style={styles.row} onPress={handleClearAll}>
-            <View>
-              <Text style={styles.rowLabel}>Start new shift</Text>
-              <Text style={styles.rowSub}>Clears all patients and items</Text>
-            </View>
-            <Text style={styles.destructiveArrow}>›</Text>
-          </TouchableOpacity>
+        <Text style={st.sec}>Shift</Text>
+        <View style={st.card}>
+          <Row title="Start new shift" sub="Clear every patient from this phone" onPress={newShift} danger />
         </View>
-
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F7', paddingTop: 60 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 24, gap: 12 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#DDD', alignItems: 'center', justifyContent: 'center' },
-  backArrow: { fontSize: 18, color: '#1C1C1E' },
-  title: { fontSize: 24, fontWeight: '600', color: '#1C1C1E' },
-  content: { paddingHorizontal: 16, paddingBottom: 40, gap: 8 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#999', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8, marginBottom: 6 },
-  card: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 0.5, borderColor: '#E5E5EA', overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
-  rowLabel: { fontSize: 15, fontWeight: '500', color: '#1C1C1E' },
-  rowSub: { fontSize: 12, color: '#999', marginTop: 2 },
-  rowArrow: { fontSize: 20, color: '#999' },
-  destructiveArrow: { fontSize: 20, color: '#E24B4A' },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  stepBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
-  stepBtnDisabled: { opacity: 0.3 },
-  stepBtnText: { fontSize: 20, color: '#1C1C1E', fontWeight: '400', lineHeight: 24 },
-  stepValue: { fontSize: 18, fontWeight: '600', color: '#1C1C1E', minWidth: 24, textAlign: 'center' },
+const st = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.bg },
+  header: { flexDirection: 'row', alignItems: 'center', gap: S.sm, paddingHorizontal: S.md, marginBottom: S.md },
+  iconBtn:{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  content:{ paddingHorizontal: S.lg, paddingBottom: 60 },
+  sec:    { ...T.label, marginTop: S.xl, marginBottom: S.sm, marginLeft: 4 },
+  card:   { backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 0.5, borderColor: C.line, overflow: 'hidden' },
+  row:    { flexDirection: 'row', alignItems: 'center', gap: S.md, paddingHorizontal: S.lg, paddingVertical: 14 },
+  div:    { height: 0.5, backgroundColor: C.line, marginLeft: S.lg },
+  stepper:{ flexDirection: 'row', alignItems: 'center', gap: S.md },
+  step:   { width: 30, height: 30, borderRadius: 15, backgroundColor: C.sunken, alignItems: 'center', justifyContent: 'center' },
+  stepVal:{ ...T.bodyM, ...T.num, minWidth: 20, textAlign: 'center' },
+  segWrap:{ paddingHorizontal: S.lg, paddingBottom: 14 },
+  seg:    { flexDirection: 'row', backgroundColor: C.sunken, borderRadius: R.sm + 2, padding: 2 },
+  segBtn: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: R.sm },
+  segOn:  { backgroundColor: C.surface },
+  foot:   { ...T.caption, fontWeight: '400', color: C.ink3, marginTop: S.sm, marginHorizontal: 4, lineHeight: 17 },
 });

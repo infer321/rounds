@@ -5,45 +5,62 @@ export type Vitals = {
   bpS?: string; bpD?: string;
   o2Mode?: 'RA' | 'NC' | 'BiPAP';
   o2Val?: string;
+  spo2?: string;
 };
 
 export type Labs = {
+  // CBC
   wbc?: string; hgb?: string; hct?: string; plt?: string;
+  // BMP
   na?: string; k?: string; cl?: string; co2?: string;
   bun?: string; cr?: string; glu?: string;
   // LFT / CMP
   ca?: string; po4?: string; tp?: string; alb?: string;
   ast?: string; alt?: string; ldh?: string; ap?: string; bili?: string;
+  // Coags + Mg
+  pt?: string; inr?: string; ptt?: string; mg?: string;
+};
+
+export type PanelKey = 'vitals' | 'cbc' | 'bmp' | 'lft' | 'coag';
+
+/** One archived set of values. Written by "Advance" / "Complete round". */
+export type Snapshot = {
+  at: number;                 // epoch ms
+  vitals?: Vitals;
+  labs?: Labs;
 };
 
 export type ImagingStudy = {
   id: string;
-  modality: string;   // 'XR' | 'CT' | 'MRI' | 'US'
-  bodyPart: string;   // e.g. 'Brain', 'Abdomen/Pelvis'
-  laterality?: string; // 'Right' | 'Left' | 'Bilateral'
+  modality: string;    // 'XR' | 'CT' | 'MRI' | 'US'
+  bodyPart: string;
+  laterality?: string;
   findings: string;
 };
 
 export type HAndP = {
   hpi?: string;
   course?: string;
+  subjective?: string;       // SOAP S
   vitals?: Vitals;
-  prevVitals?: Vitals;   // previous vitals — shown faded above each cell
-  pe?: string;           // legacy free-text (kept for migration)
+  prevVitals?: Vitals;
   labs?: Labs;
-  prevLabs?: Labs;       // yesterday's labs — shown faded top-left of each cell
+  prevLabs?: Labs;
+  otherLabs?: string;        // free-text: lactate, trop, BNP, cultures…
+  history?: Snapshot[];      // newest last, capped (see MAX_HISTORY)
   imagingStudies?: ImagingStudy[];
-  diagnostics?: string;  // kept for backward-compat / extra notes
   ap?: string;
-  subjective?: string;   // SOAP S section
-  // Structured physical exam (built in ExamBuilderScreen)
   examFindings?: Record<string, 'pos' | 'neg'>;
   examNotes?: Record<string, string>;
-  peNote?: string;            // free-text addendum shown at bottom of exam card
-  // Review of systems (built in ROSBuilderScreen)
+  peNote?: string;
   rosFindings?: Record<string, 'pos' | 'neg'>;
-  rosNote?: string;           // free-text addendum shown at bottom of ROS card
+  rosNote?: string;
+  // legacy, kept so old saves still load
+  pe?: string;
+  diagnostics?: string;
 };
+
+export const MAX_HISTORY = 14;
 
 export type Item = {
   id: string;
@@ -52,6 +69,7 @@ export type Item = {
   endsAt?: number;
   notificationId?: string;
   signout?: boolean;
+  handedOff?: boolean;       // checked off on the signout list (item is kept)
   urgent?: boolean;
 };
 
@@ -61,57 +79,7 @@ export type Patient = {
   age?: string;
   gender?: string;
   descriptor?: string;
-  colorIndex: number;
+  colorIndex: number;        // legacy, unused in UI
   items: Item[];
   hp?: HAndP;
 };
-
-export const COLORS = ['#E1F5EE', '#EEEDFE', '#FAEEDA', '#FCEBEB', '#E6F1FB', '#F0F0F0'];
-export const TEXT_COLORS = ['#085041', '#3C3489', '#633806', '#A32D2D', '#0C447C', '#444'];
-export const DOT_COLORS: Record<ItemType, string> = {
-  timer: '#1D9E75',
-  task: '#7F77DD',
-};
-
-const t = Date.now();
-const min = 60_000;
-const hr = 3_600_000;
-
-export const SAMPLE_PATIENTS: Patient[] = [
-  {
-    id: '1', initials: 'JM', colorIndex: 3,
-    items: [
-      { id: 'a', type: 'timer', label: 'Troponin due', endsAt: t + 2 * min },
-      { id: 'b', type: 'task', label: 'Consult cardio' },
-      { id: 'c', type: 'task', label: 'Code status', signout: true },
-    ]
-  },
-  {
-    id: '2', initials: 'SR', colorIndex: 0,
-    items: [
-      { id: 'd', type: 'timer', label: 'CT head', endsAt: t + 1 * hr + 20 * min },
-      { id: 'e', type: 'timer', label: 'Bx culture', endsAt: t + 46 * hr },
-      { id: 'f', type: 'task', label: 'Consult IR' },
-    ]
-  },
-  {
-    id: '3', initials: 'AL', colorIndex: 1,
-    items: [
-      { id: 'g', type: 'timer', label: 'Lactate repeat', endsAt: t + 45 * min },
-      { id: 'h', type: 'task', label: 'Family update', signout: true },
-    ]
-  },
-  {
-    id: '4', initials: 'TK', colorIndex: 4,
-    items: [
-      { id: 'i', type: 'task', label: 'Post-op vitals q15' },
-      { id: 'j', type: 'timer', label: 'INR check', endsAt: t + 3 * hr + 10 * min },
-    ]
-  },
-  {
-    id: '5', initials: 'PW', colorIndex: 2,
-    items: [
-      { id: 'k', type: 'task', label: 'Discuss dispo', signout: true },
-    ]
-  },
-];

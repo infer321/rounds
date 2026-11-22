@@ -32,7 +32,11 @@ export type CountdownResult = {
 
 export function formatCountdown(endsAt: number, now: number): CountdownResult {
   const diff = endsAt - now;
-  if (diff <= 0) return { display: 'OVERDUE', isOverdue: true, isUrgent: true };
+  if (diff <= 0) {
+    const over = Math.floor(-diff / 60_000);
+    const display = over < 1 ? 'Due now' : over < 60 ? `${over}m over` : `${Math.floor(over / 60)}h ${over % 60}m over`;
+    return { display, isOverdue: true, isUrgent: true };
+  }
 
   const totalSec = Math.floor(diff / 1000);
   const h = Math.floor(totalSec / 3600);

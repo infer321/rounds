@@ -12,6 +12,7 @@ import {
   Keyboard, Platform, KeyboardEvent,
 } from 'react-native';
 import { useKbCtx } from '../context/KeyboardContext';
+import { C } from '../theme';
 
 // kept as named export so other files don't need changes
 export const TOOLBAR_ID = 'rounds-toolbar';
@@ -81,7 +82,7 @@ const st = StyleSheet.create({
     right: 0,
     zIndex: 9999,
     elevation: 9999,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#D3D5DA',
   },
   suggBar: {
     backgroundColor: '#E8EBEF',
@@ -109,7 +110,7 @@ const st = StyleSheet.create({
   chipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: C.ink,
   },
   numRow: {
     flexDirection: 'row',
@@ -131,6 +132,6 @@ const st = StyleSheet.create({
   keyText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1C1C1E',
+    color: C.ink,
   },
 });

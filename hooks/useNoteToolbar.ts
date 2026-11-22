@@ -1,44 +1,36 @@
 /**
- * useNoteToolbar
- *
- * Spread onto any multiline TextInput to connect it to the floating
- * keyboard toolbar (KeyboardAccessory).
- *
- * Usage:
- *   const tb = useNoteToolbar(local.hpi ?? '', v => patch({ hpi: v }));
- *   <TextInput {...tb} ... />
+ * Connects a multiline TextInput to the floating keyboard toolbar.
+ * After a toolbar insert, the caret is put back where the insert ended
+ * (React Native otherwise jumps it to the end of the text).
  */
-import { useRef } from 'react';
-import { NativeSyntheticEvent, TextInputSelectionChangeEventData } from 'react-native';
+import { RefObject, useRef } from 'react';
+import { NativeSyntheticEvent, TextInput, TextInputSelectionChangeEventData } from 'react-native';
 import { useKbCtx } from '../context/KeyboardContext';
 
-export function useNoteToolbar(value: string, onChange: (v: string) => void) {
+export function useNoteToolbar(value: string, onChange: (v: string) => void, inputRef?: RefObject<TextInput | null>) {
   const { registerInsert } = useKbCtx();
-
-  const selRef = useRef({ start: 0, end: 0 });
-  const valRef = useRef(value);
-  const chgRef = useRef(onChange);
-  valRef.current = value;
-  chgRef.current = onChange;
+  const sel = useRef({ start: value.length, end: value.length });
+  const val = useRef(value);
+  const chg = useRef(onChange);
+  val.current = value;
+  chg.current = onChange;
 
   return {
     onFocus: () => {
       registerInsert((str: string, replaceFrom?: number) => {
-        const sel = selRef.current;
-        const start = replaceFrom !== undefined ? replaceFrom : sel.start;
-        const end   = sel.end;
-        const v = valRef.current;
-        const newVal = v.slice(0, start) + str + v.slice(end);
-        chgRef.current(newVal);
-        selRef.current = { start: start + str.length, end: start + str.length };
+        const start = replaceFrom ?? sel.current.start;
+        const end = sel.current.end;
+        const next = val.current.slice(0, start) + str + val.current.slice(end);
+        const caret = start + str.length;
+        val.current = next;
+        sel.current = { start: caret, end: caret };
+        chg.current(next);
+        requestAnimationFrame(() => inputRef?.current?.setSelection?.(caret, caret));
       });
     },
-
-    // Small delay: lets any toolbar onPress fire before the handler clears
     onBlur: () => setTimeout(() => registerInsert(null), 150),
-
     onSelectionChange: (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-      selRef.current = e.nativeEvent.selection;
+      sel.current = e.nativeEvent.selection;
     },
   };
 }

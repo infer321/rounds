@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "rounds",
+    "name": "Rounds",
     "slug": "rounds",
-    "version": "1.0.4",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F4F4F1"
     },
     "ios": {
       "supportsTablet": true,
@@ -18,7 +18,7 @@
       "buildNumber": "5",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "Rounds uses Face ID to protect patient data."
+        "NSFaceIDUsageDescription": "Rounds uses Face ID to keep your patient list private."
       }
     },
     "android": {

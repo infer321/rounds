@@ -24,6 +24,8 @@ import {
 import { useKbCtx, Suggestion } from '../context/KeyboardContext';
 import { Labs, HAndP, Vitals } from '../data/patients';
 import { EXAM_SECTIONS } from '../data/examSections';
+import { LAB_LABEL as LAB_LABEL_FULL, labFlag } from '../utils/clinical';
+import { C } from '../theme';
 
 // ── Lab triggers ───────────────────────────────────────────────────────────
 
@@ -46,16 +48,13 @@ const LAB_ALIAS: Record<string, keyof Labs> = {
   ast: 'ast',
   alt: 'alt',
   ldh: 'ldh',
-  bili: 'bili', bilirubin: 'bili',
+  bili: 'bili', bilirubin: 'bili', tbili: 'bili',
+  alp: 'ap',   alkphos: 'ap', 'alk': 'ap',
+  mg:  'mg',   magnesium: 'mg',
+  pt:  'pt',   inr: 'inr',  ptt: 'ptt',
 };
 
-const LAB_LABEL: Partial<Record<keyof Labs, string>> = {
-  na: 'Na',   k: 'K',    cl: 'Cl',   co2: 'HCO₃',
-  bun: 'BUN', cr: 'Cr',  glu: 'Glu',
-  wbc: 'WBC', hgb: 'Hgb', hct: 'HCT', plt: 'Plts',
-  ca: 'Ca',   po4: 'PO₄', tp: 'TP',   alb: 'Alb',
-  ast: 'AST', alt: 'ALT', ldh: 'LDH', ap: 'AP',  bili: 'Bili',
-};
+const LAB_LABEL: Partial<Record<keyof Labs, string>> = LAB_LABEL_FULL;
 
 // ── Vitals triggers ────────────────────────────────────────────────────────
 // Maps typed prefix → vital key(s)
@@ -129,11 +128,11 @@ type Props = {
   onFocused?:   () => void;
 };
 
-const BORDER    = '#D8D8D8';
-const BG        = '#fff';
+const BORDER    = C.line;
+const BG        = C.surface;
 const PADDING_H = 14;
 const PADDING_V = 12;
-const FONT_SIZE  = 14;
+const FONT_SIZE  = 15;
 const LINE_H     = 21;
 
 export default function APInput({ value, onChange, hp, style, placeholder, onFocused }: Props) {
@@ -148,9 +147,26 @@ export default function APInput({ value, onChange, hp, style, placeholder, onFoc
   const [localValue, setLocalValue] = useState(value);
   const [focused,    setFocused]    = useState(false);
 
+  // Commit to parent shortly after typing pauses, and always on unmount,
+  // so nothing is lost if the app backgrounds or you navigate mid-edit.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyRef   = useRef(false);
+  const flushNow = useCallback(() => {
+    if (flushTimer.current) { clearTimeout(flushTimer.current); flushTimer.current = null; }
+    if (dirtyRef.current) { dirtyRef.current = false; onChangeRef.current(localRef.current); }
+  }, []);
+  const scheduleFlush = useCallback(() => {
+    dirtyRef.current = true;
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+    flushTimer.current = setTimeout(flushNow, 350);
+  }, [flushNow]);
+  useEffect(() => flushNow, [flushNow]);
+
   // Sync incoming prop when NOT focused (e.g., patient switch or initial load)
   useEffect(() => {
-    if (!focused) {
+    if (!focused && !dirtyRef.current) {
       setLocalValue(value);
       localRef.current = value;
       prevLinesRef.current = value.split('\n').length;
@@ -165,9 +181,12 @@ export default function APInput({ value, onChange, hp, style, placeholder, onFoc
     const end   = sel.end;
     const v     = localRef.current;
     const newVal = v.slice(0, start) + str + v.slice(end);
+    const caret  = start + str.length;
     localRef.current = newVal;
     setLocalValue(newVal);
-    selRef.current = { start: start + str.length, end: start + str.length };
+    selRef.current = { start: caret, end: caret };
+    scheduleFlush();
+    requestAnimationFrame(() => inputRef.current?.setSelection?.(caret, caret));
   }, []);
 
   // ── Suggestion detection ───────────────────────────────────────────────
@@ -252,9 +271,11 @@ export default function APInput({ value, onChange, hp, style, placeholder, onFoc
         if (alias.startsWith(lastWord) && labs[labKey] && !seen.has(labKey)) {
           seen.add(labKey);
           const lbl = LAB_LABEL[labKey] ?? labKey.toUpperCase();
+          const f   = labFlag(labKey, labs[labKey]);
+          const txt = `${lbl} ${labs[labKey]}${f ? ` (${f})` : ''}`;
           sugg.push({
-            label:       `${lbl} ${labs[labKey]}`,
-            insert:      `${lbl} ${labs[labKey]}`,
+            label:       txt,
+            insert:      txt,
             replaceFrom: wordStart,
           });
         }
@@ -271,7 +292,7 @@ export default function APInput({ value, onChange, hp, style, placeholder, onFoc
 
   function renderLines(text: string): React.ReactNode {
     if (!text) {
-      return <Text style={[st.fmtLine, { color: '#CCC' }]}>{placeholder}</Text>;
+      return <Text style={[st.fmtLine, { color: C.ink4 }]}>{placeholder}</Text>;
     }
     return text.split('\n').map((line, i) => (
       <Text key={i} style={/^#+/.test(line) ? [st.fmtLine, st.fmtHeader] : st.fmtLine}>
@@ -285,14 +306,14 @@ export default function APInput({ value, onChange, hp, style, placeholder, onFoc
   function handleFocus() {
     setFocused(true);
     registerInsert(insertFn);
-    setExtraKeys(['#']);
+    setExtraKeys(['#', '-']);
     prevLinesRef.current = localRef.current.split('\n').length;
     onFocused?.();
   }
 
   function handleBlur() {
+    flushNow();
     setTimeout(() => {
-      onChange(localRef.current);   // flush local text to parent ONCE on blur
       setFocused(false);
       registerInsert(null);
       setExtraKeys([]);
@@ -316,10 +337,15 @@ export default function APInput({ value, onChange, hp, style, placeholder, onFoc
             style={st.transparentInput}
             value={localValue}
             onChangeText={text => {
+              // Caret estimate: onChangeText fires before onSelectionChange
+              const prevLen = localRef.current.length;
+              const caret   = Math.max(0, Math.min(text.length, selRef.current.end + (text.length - prevLen)));
               localRef.current = text;
-              setLocalValue(text);           // local update only (fast — no parent re-render)
+              setLocalValue(text);
+              selRef.current = { start: caret, end: caret };
+              scheduleFlush();
 
-              detectSuggestions(text, text.length);
+              detectSuggestions(text, caret);
 
               // Re-center when a new line is added (Enter key pressed)
               const newLines = text.split('\n').length;
@@ -390,14 +416,11 @@ const st = StyleSheet.create({
 
   fmtLine: {
     fontSize:   FONT_SIZE,
-    color:      '#1C1C1E',
+    color:      C.ink,
     lineHeight: LINE_H,
   },
+  // Same size + line height as body text so the hidden caret stays aligned
   fmtHeader: {
     fontWeight: '700',
-    fontSize:   15,
-    lineHeight: LINE_H,
-    marginTop:  4,
-    color:      '#1C1C1E',
   },
 });

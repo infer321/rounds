@@ -13,6 +13,8 @@
 import { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { ImagingStudy } from '../data/patients';
+import { uid } from '../utils/id';
+import { C } from '../theme';
 
 // ── Imaging data ───────────────────────────────────────────────────────────
 
@@ -58,6 +60,8 @@ const BODY_PARTS: BodyPartDef[] = [
   { label: 'LE Venous (DVT)',     search: 'dvt lower extremity venous le leg',      needsLateral: true  },
   { label: 'UE Venous',           search: 'upper extremity venous ue arm dvt',      needsLateral: true  },
   { label: 'PE Protocol',         search: 'pe pulmonary embolism ctpa',             needsLateral: false },
+  { label: 'Echo (TTE)',          search: 'echo tte heart cardiac transthoracic',  needsLateral: false },
+  { label: 'Echo (TEE)',          search: 'tee transesophageal echo',              needsLateral: false },
   { label: 'Angio Head/Neck',     search: 'angio cta mra head neck angiography',    needsLateral: false },
 ];
 
@@ -91,8 +95,8 @@ type Props = {
   onChange: (s: ImagingStudy[]) => void;
 };
 
-const BORDER = '#D8D8D8';
-const BG     = '#fff';
+const BORDER = C.line;
+const BG     = C.surface;
 const MAX_PILLS = 12;
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -164,7 +168,7 @@ export default function DiagnosticsInput({ studies, onChange }: Props) {
   function commit() {
     if (!draft.modality || !draft.bodyPart) return;
     onChange([...studies, {
-      id: Date.now().toString(),
+      id: uid(),
       modality: draft.modality,
       bodyPart: draft.bodyPart.label,
       laterality: draft.laterality || undefined,
@@ -180,7 +184,7 @@ export default function DiagnosticsInput({ studies, onChange }: Props) {
   function commitAndStartNext(modality: string) {
     if (!draft.modality || !draft.bodyPart) return;
     onChange([...studies, {
-      id: Date.now().toString(),
+      id: uid(),
       modality: draft.modality,
       bodyPart: draft.bodyPart.label,
       laterality: draft.laterality || undefined,
@@ -238,7 +242,7 @@ export default function DiagnosticsInput({ studies, onChange }: Props) {
                 }
                 multiline
                 placeholder="pending…"
-                placeholderTextColor="#CCC"
+                placeholderTextColor={C.ink4}
                 textAlignVertical="top"
               />
             </View>
@@ -267,7 +271,7 @@ export default function DiagnosticsInput({ studies, onChange }: Props) {
             onKeyPress={handleKeyPress}
             returnKeyType={phase === 'findings' ? 'done' : 'next'}
             placeholder={phrasePlaceholder[phase]}
-            placeholderTextColor="#CCC"
+            placeholderTextColor={C.ink4}
             blurOnSubmit={false}
             autoCorrect={phase === 'findings'}
             autoCapitalize={phase === 'findings' ? 'sentences' : 'none'}
@@ -329,27 +333,27 @@ const st = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: C.line,
     gap: 6,
   },
   studyBody: { flex: 1 },
   studyLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#888',
+    color: C.ink3,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
     marginBottom: 3,
   },
   studyFindings: {
     fontSize: 13,
-    color: '#1C1C1E',
+    color: C.ink,
     paddingVertical: 0,
     lineHeight: 18,
   },
   deleteX: {
     fontSize: 20,
-    color: '#CCC',
+    color: C.ink4,
     lineHeight: 22,
     marginTop: 1,
   },
@@ -369,13 +373,13 @@ const st = StyleSheet.create({
   prefix: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#555',
+    color: C.ink2,
   },
   input: {
     flex: 1,
     minWidth: 80,
     fontSize: 13,
-    color: '#1C1C1E',
+    color: C.ink,
     paddingVertical: 0,
   },
 
@@ -387,21 +391,21 @@ const st = StyleSheet.create({
     marginTop: 10,
   },
   pill: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: C.bg,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 0.5,
-    borderColor: '#E0E0E0',
+    borderColor: C.line,
   },
   pillPrimary: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#1C1C1E',
+    backgroundColor: C.ink,
+    borderColor: C.ink,
   },
   pillText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#444',
+    color: C.ink2,
   },
   pillPrimaryText: {
     color: '#fff',
@@ -415,27 +419,27 @@ const st = StyleSheet.create({
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 0.5,
-    borderTopColor: '#EBEBEB',
+    borderTopColor: C.line,
   },
   nextLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#CCC',
+    color: C.ink4,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginRight: 2,
   },
   nextPill: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: C.bg,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 0.5,
-    borderColor: '#E8E8E8',
+    borderColor: C.line,
   },
   nextPillText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#888',
+    color: C.ink3,
   },
 });
