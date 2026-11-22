@@ -193,24 +193,29 @@ export default function PatientScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backArrow}>←</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={openEditInitials} activeOpacity={0.7}>
-          <View style={[styles.avatar, { backgroundColor: COLORS[patient.colorIndex] }]}>
-            <Text style={[styles.avatarText, { color: TEXT_COLORS[patient.colorIndex] }]}>
-              {patient.initials}
-            </Text>
+        <TouchableOpacity onPress={openEditInitials} activeOpacity={0.75}>
+          <View style={styles.avatarWrapper}>
+            <View style={[styles.avatar, { backgroundColor: COLORS[patient.colorIndex] }]}>
+              <Text style={[styles.avatarText, { color: TEXT_COLORS[patient.colorIndex] }]}>
+                {patient.initials}
+              </Text>
+            </View>
+            <View style={styles.avatarBadge}>
+              <Text style={styles.avatarBadgeText}>✎</Text>
+            </View>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.patientMeta} onPress={openEditDetails} activeOpacity={0.7}>
-          {(patient.age || patient.gender || patient.descriptor) ? (
-            <Text style={styles.patientName} numberOfLines={1}>
-              {[patient.age && patient.gender ? `${patient.age}${patient.gender}` : (patient.age || patient.gender), patient.descriptor].filter(Boolean).join(' ')}
-            </Text>
-          ) : (
-            <Text style={styles.patientNameEmpty}>Add age / details</Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.addItemBtn} onPress={openAdd}>
-          <Text style={styles.addItemText}>+ Add</Text>
+        <TouchableOpacity style={styles.patientMeta} onPress={openEditDetails} activeOpacity={0.75}>
+          <View style={styles.metaPill}>
+            {(patient.age || patient.gender || patient.descriptor) ? (
+              <Text style={styles.patientName} numberOfLines={1}>
+                {[patient.age && patient.gender ? `${patient.age}${patient.gender}` : (patient.age || patient.gender), patient.descriptor].filter(Boolean).join(' ')}
+              </Text>
+            ) : (
+              <Text style={styles.patientNameEmpty}>Add age / details…</Text>
+            )}
+            <Text style={styles.metaPen}>✎</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -226,6 +231,15 @@ export default function PatientScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* ── Add button — timers tab only, below tab bar ── */}
+      {activeTab === 'timers' && (
+        <View style={styles.addBtnRow}>
+          <TouchableOpacity style={styles.addItemBtn} onPress={openAdd}>
+            <Text style={styles.addItemText}>+ Add</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ── Timers tab ── */}
       {activeTab === 'timers' && (
@@ -305,6 +319,7 @@ export default function PatientScreen() {
       {activeTab === 'hp' && (
         <HAndPSection
           key={patient.id}
+          patientId={patient.id}
           hp={patient.hp ?? {}}
           onUpdate={newHp => updateHP(patient.id, newHp)}
         />
@@ -314,6 +329,7 @@ export default function PatientScreen() {
       {activeTab === 'soap' && (
         <SOAPSection
           key={patient.id}
+          patientId={patient.id}
           hp={patient.hp ?? {}}
           onUpdate={newHp => updateHP(patient.id, newHp)}
         />
@@ -630,11 +646,16 @@ export default function PatientScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F7', paddingTop: 60 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 16, gap: 10 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#DDD', alignItems: 'center', justifyContent: 'center' },
-  backArrow: { fontSize: 18, color: '#1C1C1E' },
+  backBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#DDD', alignItems: 'center', justifyContent: 'center' },
+  backArrow: { fontSize: 20, color: '#1C1C1E' },
+  avatarWrapper: { position: 'relative' },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 13, fontWeight: '600' },
+  avatarBadge: { position: 'absolute', bottom: -3, right: -5, backgroundColor: '#fff', borderRadius: 9, width: 17, height: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#DDD', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
+  avatarBadgeText: { fontSize: 9, color: '#999', lineHeight: 11 },
   patientMeta: { flex: 1 },
+  metaPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.045)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+  metaPen: { fontSize: 13, color: '#BBBBBB' },
   patientName: { fontSize: 17, fontWeight: '600', color: '#1C1C1E' },
   patientNameEmpty: { fontSize: 14, color: '#BBB', fontStyle: 'italic' },
   ageGenderRow: { flexDirection: 'row', gap: 8, marginBottom: 12, alignItems: 'center' },
@@ -643,8 +664,9 @@ const styles = StyleSheet.create({
   genderPillActive: { backgroundColor: '#1C1C1E' },
   genderPillText: { fontSize: 15, fontWeight: '600', color: '#999' },
   genderPillTextActive: { color: '#fff' },
-  addItemBtn: { backgroundColor: '#1C1C1E', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
-  addItemText: { color: '#fff', fontSize: 13, fontWeight: '500' },
+  addBtnRow: { paddingHorizontal: 16, marginBottom: 10 },
+  addItemBtn: { backgroundColor: '#1C1C1E', paddingVertical: 11, borderRadius: 14, alignItems: 'center' },
+  addItemText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   tabBar: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, backgroundColor: '#F0F0F0', borderRadius: 12, padding: 3, gap: 3 },
   tabBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
   tabBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 },

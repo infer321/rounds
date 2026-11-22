@@ -50,7 +50,19 @@ export default function SignoutScreen() {
                     {patient.initials}
                   </Text>
                 </View>
-                <Text style={styles.groupLabel}>Patient {patient.initials}</Text>
+                <View style={styles.groupMeta}>
+                  {(patient.age || patient.gender) ? (
+                    <Text style={styles.groupAgeGender}>
+                      {[patient.age, patient.gender].filter(Boolean).join('')}
+                    </Text>
+                  ) : null}
+                  {patient.descriptor ? (
+                    <Text style={styles.groupDescriptor} numberOfLines={1}>{patient.descriptor}</Text>
+                  ) : null}
+                  {!patient.age && !patient.gender && !patient.descriptor ? (
+                    <Text style={styles.groupDescriptor}>{patient.initials}</Text>
+                  ) : null}
+                </View>
                 <Text style={styles.groupCount}>{items.length} item{items.length !== 1 ? 's' : ''}</Text>
               </View>
 
@@ -84,10 +96,12 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, gap: 16, paddingBottom: 40 },
   group: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 0.5, borderColor: '#E5E5EA' },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0' },
-  avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   avatarText: { fontSize: 11, fontWeight: '600' },
-  groupLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1C1C1E' },
-  groupCount: { fontSize: 12, color: '#999' },
+  groupMeta: { flex: 1 },
+  groupAgeGender: { fontSize: 14, fontWeight: '700', color: '#1C1C1E', lineHeight: 18 },
+  groupDescriptor: { fontSize: 12, color: '#888', lineHeight: 16 },
+  groupCount: { fontSize: 12, color: '#999', flexShrink: 0 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0' },
   checkbox: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: '#BA7517' },
   itemLabel: { flex: 1, fontSize: 15, color: '#1C1C1E' },

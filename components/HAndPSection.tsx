@@ -1,12 +1,25 @@
 import { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { useNoteToolbar } from '../hooks/useNoteToolbar';
+import { useScrollToCenter } from '../hooks/useScrollToCenter';
+import APInput from './APInput';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../App';
 import { HAndP, Labs, Vitals } from '../data/patients';
-import { CBCFishbone, BMPFishbone } from './LabFishbone';
+import { EXAM_SECTIONS } from '../data/examSections';
+import { ROS_SECTIONS } from '../data/rosSections';
+import { CBCFishbone, BMPFishbone, LFTFishbone } from './LabFishbone';
+import DiagnosticsInput from './DiagnosticsInput';
 
 const BORDER = '#D8D8D8';
 const BG = '#fff';
 
-const LAB_ORDER: (keyof Labs)[] = ['wbc', 'hgb', 'hct', 'plt', 'na', 'k', 'cl', 'co2', 'bun', 'cr', 'glu'];
+const LAB_ORDER: (keyof Labs)[] = [
+  'wbc', 'hgb', 'hct', 'plt',
+  'na', 'k', 'cl', 'co2', 'bun', 'cr', 'glu',
+  'ca', 'po4', 'tp', 'alb', 'ast', 'alt', 'ldh', 'ap', 'bili',
+];
 const VIT_ORDER = ['temp', 'rr', 'hr', 'bpS', 'bpD'] as const;
 
 // Reference ranges for vitals (Celsius for temp)
@@ -18,6 +31,14 @@ const VIT_RANGES: Record<string, [number, number]> = {
   bpD:  [60,   80],
 };
 
+function prevVitColor(val: string, lo: number, hi: number): string {
+  const n = parseFloat(val);
+  if (!val || isNaN(n)) return '#AAAAAA';
+  if (n > hi) return '#D97F7E';
+  if (n < lo) return '#7AAEC8';
+  return '#AAAAAA';
+}
+
 function valueColor(val: string, lo: number, hi: number): string {
   const n = parseFloat(val);
   if (!val || isNaN(n)) return '#1C1C1E';
@@ -26,49 +47,215 @@ function valueColor(val: string, lo: number, hi: number): string {
   return '#1C1C1E';
 }
 
-type Props = { hp: HAndP; onUpdate: (hp: HAndP) => void };
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Props = { patientId: string; hp: HAndP; onUpdate: (hp: HAndP) => void };
 
 // ─── Vital cell ───────────────────────────────────────────────
-function VitCell({ label, value, onChange, inputRef, onNext, isLast, lo, hi }: {
-  label: string; value: string; onChange: (v: string) => void;
+function VitCell({ label, value, prevValue, onChange, inputRef, onNext, isLast, lo, hi, maxLen }: {
+  label: string; value: string; prevValue?: string; onChange: (v: string) => void;
   inputRef: (r: TextInput | null) => void;
   onNext: () => void; isLast: boolean;
   lo: number; hi: number;
+  maxLen?: number;
 }) {
-  const col = valueColor(value, lo, hi);
   return (
     <View style={s.vitCell}>
-      <Text style={s.vitLabel}>{label}</Text>
+      {!!prevValue && (
+        <Text style={[s.vitPrev, { color: prevVitColor(prevValue, lo, hi) }]}>{prevValue}</Text>
+      )}
+      <Text style={s.vitLabel} numberOfLines={1}>{label}</Text>
       <TextInput
         ref={inputRef}
-        style={[s.vitInput, { color: col }]}
+        style={[s.vitInput, { color: valueColor(value, lo, hi) }]}
         value={value}
-        onChangeText={onChange}
+        onChangeText={t => { if (/^\d*\.?\d?$/.test(t)) onChange(t); }}
         keyboardType="decimal-pad"
         returnKeyType={isLast ? 'done' : 'next'}
         onSubmitEditing={isLast ? undefined : onNext}
         placeholder="—"
         placeholderTextColor="#CCC"
         textAlign="center"
-        maxLength={5}
+        selectTextOnFocus
+        blurOnSubmit={isLast}
+        maxLength={maxLen}
+      />
+    </View>
+  );
+}
+
+// ─── Exam display card ────────────────────────────────────────
+// Flat chip row — all findings in one line, pos (dark) then neg (green).
+// No system labels to keep vertical footprint minimal.
+function ExamCard({ examFindings, peNote, onPeNoteChange, onPress }: {
+  examFindings: Record<string, 'pos' | 'neg'>;
+  peNote: string;
+  onPeNoteChange: (v: string) => void;
+  onPress: () => void;
+}) {
+  const posItems: string[] = [];
+  const negItems: string[] = [];
+  EXAM_SECTIONS.forEach(sec =>
+    sec.findings.forEach(f => {
+      const state = examFindings[`${sec.key}_${f.key}`];
+      if (state === 'pos') posItems.push(f.pos);
+      if (state === 'neg') negItems.push(f.neg);
+    })
+  );
+  const hasFindings = posItems.length > 0 || negItems.length > 0;
+
+  return (
+    <View style={s.examCard}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
+        {hasFindings ? (
+          <>
+            <View style={s.examChips}>
+              {posItems.map((t, i) => (
+                <View key={`p${i}`} style={s.examChipPos}>
+                  <Text style={s.examChipPosText}>{t}</Text>
+                </View>
+              ))}
+              {negItems.map((t, i) => (
+                <View key={`n${i}`} style={s.examChipNeg}>
+                  <Text style={s.examChipNegText}>{t}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={s.examEditHint}>Tap to edit →</Text>
+          </>
+        ) : (
+          <Text style={s.examPlaceholder}>Tap to document physical exam →</Text>
+        )}
+      </TouchableOpacity>
+
+      {/* Free-text addendum — always visible below findings */}
+      <TextInput
+        style={s.examExtraInput}
+        placeholder="Additional exam notes…"
+        placeholderTextColor="#CCC"
+        value={peNote}
+        onChangeText={onPeNoteChange}
+        multiline
+        textAlignVertical="top"
+      />
+    </View>
+  );
+}
+
+// ─── ROS display card ─────────────────────────────────────────
+// Flat chip row — reports (red) then denies (green). Same sync pattern as
+// ExamCard: reads rosFindings from the hp prop so it stays fresh after builder.
+function ROSCard({ rosFindings, rosNote, onRosNoteChange, onPress }: {
+  rosFindings: Record<string, 'pos' | 'neg'>;
+  rosNote: string;
+  onRosNoteChange: (v: string) => void;
+  onPress: () => void;
+}) {
+  const posItems: string[] = [];
+  const negItems: string[] = [];
+  ROS_SECTIONS.forEach(sec =>
+    sec.findings.forEach(f => {
+      const state = rosFindings[`${sec.key}_${f.key}`];
+      if (state === 'pos') posItems.push(f.pos);
+      if (state === 'neg') negItems.push(f.neg);
+    })
+  );
+  const hasFindings = posItems.length > 0 || negItems.length > 0;
+
+  return (
+    <View style={s.examCard}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
+        {hasFindings ? (
+          <>
+            <View style={s.examChips}>
+              {posItems.map((t, i) => (
+                <View key={`p${i}`} style={s.examChipPos}>
+                  <Text style={s.examChipPosText}>{t}</Text>
+                </View>
+              ))}
+              {negItems.map((t, i) => (
+                <View key={`n${i}`} style={s.examChipNeg}>
+                  <Text style={s.examChipNegText}>{t}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={s.examEditHint}>Tap to edit →</Text>
+          </>
+        ) : (
+          <Text style={s.examPlaceholder}>Tap to document review of systems →</Text>
+        )}
+      </TouchableOpacity>
+      <TextInput
+        style={s.examExtraInput}
+        placeholder="Additional ROS notes…"
+        placeholderTextColor="#CCC"
+        value={rosNote}
+        onChangeText={onRosNoteChange}
+        multiline
+        textAlignVertical="top"
       />
     </View>
   );
 }
 
 // ─── Main ─────────────────────────────────────────────────────
-export default function HAndPSection({ hp, onUpdate }: Props) {
+export default function HAndPSection({ patientId, hp, onUpdate }: Props) {
+  const navigation = useNavigation<Nav>();
   const [local, setLocal] = useState<HAndP>(hp);
-  const labRefs = useRef<Partial<Record<keyof Labs, TextInput | null>>>({});
-  const vitRefs = useRef<Partial<Record<typeof VIT_ORDER[number], TextInput | null>>>({});
+  const labRefs   = useRef<Partial<Record<keyof Labs, TextInput | null>>>({});
+  const vitRefs   = useRef<Partial<Record<typeof VIT_ORDER[number], TextInput | null>>>({});
+  const hpiRef    = useRef<TextInput>(null);
+  const courseRef = useRef<TextInput>(null);
+  const apRef     = useRef<View>(null);
+  const { scrollRef, scrollProps, centerInput } = useScrollToCenter();
 
   function patch(u: Partial<HAndP>) {
-    const next = { ...local, ...u };
+    // Always pull builder-owned fields from the hp prop — ExamBuilder and
+    // ROSBuilder write directly to context; local state never sees those updates.
+    const next = {
+      ...local,
+      examFindings: hp.examFindings,
+      examNotes:    hp.examNotes,
+      rosFindings:  hp.rosFindings,
+      ...u,
+    };
     setLocal(next);
     onUpdate(next);
   }
   function pV(v: Partial<Vitals>) { patch({ vitals: { ...local.vitals, ...v } }); }
   function pL(key: keyof Labs, val: string) { patch({ labs: { ...local.labs, [key]: val } }); }
+
+  // Keyboard toolbar registration for note fields
+  const hpiTb    = useNoteToolbar(local.hpi    ?? '', v => patch({ hpi: v }));
+  const courseTb = useNoteToolbar(local.course ?? '', v => patch({ course: v }));
+
+  const CBC_KEYS: (keyof Labs)[] = ['wbc', 'hgb', 'hct', 'plt'];
+  const BMP_KEYS: (keyof Labs)[] = ['na', 'k', 'cl', 'co2', 'bun', 'cr', 'glu'];
+  const LFT_KEYS: (keyof Labs)[] = ['ca', 'po4', 'tp', 'alb', 'ast', 'alt', 'ldh', 'ap', 'bili'];
+
+  function advanceCBC() {
+    const prevLabs = { ...local.prevLabs };
+    const labs = { ...local.labs };
+    CBC_KEYS.forEach(k => { if (labs[k]) prevLabs[k] = labs[k]; labs[k] = undefined; });
+    patch({ labs, prevLabs });
+  }
+
+  function advanceBMP() {
+    const prevLabs = { ...local.prevLabs };
+    const labs = { ...local.labs };
+    BMP_KEYS.forEach(k => { if (labs[k]) prevLabs[k] = labs[k]; labs[k] = undefined; });
+    patch({ labs, prevLabs });
+  }
+
+  function advanceLFT() {
+    const prevLabs = { ...local.prevLabs };
+    const labs = { ...local.labs };
+    LFT_KEYS.forEach(k => { if (labs[k]) prevLabs[k] = labs[k]; labs[k] = undefined; });
+    patch({ labs, prevLabs });
+  }
+
+  function advanceVitals() {
+    patch({ prevVitals: { ...local.vitals }, vitals: {} });
+  }
 
   function advLab(cur: keyof Labs) {
     const next = LAB_ORDER[LAB_ORDER.indexOf(cur) + 1];
@@ -79,102 +266,183 @@ export default function HAndPSection({ hp, onUpdate }: Props) {
     if (next) vitRefs.current[next]?.focus();
   }
 
-  const vit = local.vitals ?? {};
-  const labs = local.labs ?? {};
+  const vit      = local.vitals    ?? {};
+  const prevVit  = local.prevVitals ?? {};
+  const labs     = local.labs     ?? {};
+  const prevLabs = local.prevLabs ?? {};
 
   const bpSColor = valueColor(vit.bpS ?? '', VIT_RANGES.bpS[0], VIT_RANGES.bpS[1]);
   const bpDColor = valueColor(vit.bpD ?? '', VIT_RANGES.bpD[0], VIT_RANGES.bpD[1]);
 
   return (
-    <ScrollView style={s.scroll} contentContainerStyle={s.content}
-      keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <ScrollView
+      ref={scrollRef}
+      style={s.scroll} contentContainerStyle={s.content}
+      keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+      automaticallyAdjustKeyboardInsets={true}
+      {...scrollProps}
+    >
 
       {/* ── HPI ─────────────────────────── */}
       <Text style={s.secTitle}>HPI</Text>
-      <TextInput style={s.note} value={local.hpi ?? ''} onChangeText={v => patch({ hpi: v })}
-        multiline placeholder="History of present illness…" placeholderTextColor="#CCC" />
+      <TextInput
+        ref={hpiRef}
+        style={s.note} value={local.hpi ?? ''} onChangeText={v => patch({ hpi: v })}
+        multiline placeholder="History of present illness…" placeholderTextColor="#CCC"
+        {...hpiTb}
+        onFocus={() => { hpiTb.onFocus(); centerInput(hpiRef.current); }}
+      />
+
+      {/* ── Review of Systems ───────────── */}
+      <Text style={s.secTitle}>Review of Systems</Text>
+      <ROSCard
+        rosFindings={hp.rosFindings ?? {}}
+        rosNote={local.rosNote ?? ''}
+        onRosNoteChange={v => patch({ rosNote: v })}
+        onPress={() => navigation.navigate('ROSBuilder', { patientId })}
+      />
 
       {/* ── ED / Hosp Course ────────────── */}
       <Text style={s.secTitle}>ED / Hosp Course</Text>
-      <TextInput style={s.note} value={local.course ?? ''} onChangeText={v => patch({ course: v })}
-        multiline placeholder="Hospital / ED course…" placeholderTextColor="#CCC" />
+      <TextInput
+        ref={courseRef}
+        style={s.note} value={local.course ?? ''} onChangeText={v => patch({ course: v })}
+        multiline placeholder="Hospital / ED course…" placeholderTextColor="#CCC"
+        {...courseTb}
+        onFocus={() => { courseTb.onFocus(); centerInput(courseRef.current); }}
+      />
 
       {/* ── Vitals ──────────────────────── */}
-      <Text style={s.secTitle}>Vitals</Text>
+      <View style={s.vitSectionHeader}>
+        <Text style={[s.secTitle, { marginTop: 0, marginBottom: 0 }]}>Vitals</Text>
+        <TouchableOpacity onPress={advanceVitals} style={s.advBtn}>
+          <Text style={s.advBtnText}>Adv →</Text>
+        </TouchableOpacity>
+      </View>
       <View style={s.vitRow}>
-        <VitCell label="Temp °C" value={vit.temp ?? ''} onChange={v => pV({ temp: v })}
+        <VitCell label="T °C"
+          value={vit.temp ?? ''} prevValue={prevVit.temp}
+          onChange={v => pV({ temp: v })}
           inputRef={r => { vitRefs.current.temp = r; }} onNext={() => advVit('temp')} isLast={false}
-          lo={VIT_RANGES.temp[0]} hi={VIT_RANGES.temp[1]} />
-        <VitCell label="RR" value={vit.rr ?? ''} onChange={v => pV({ rr: v })}
+          lo={VIT_RANGES.temp[0]} hi={VIT_RANGES.temp[1]} maxLen={4} />
+        <VitCell label="RR" value={vit.rr ?? ''} prevValue={prevVit.rr} onChange={v => pV({ rr: v })}
           inputRef={r => { vitRefs.current.rr = r; }} onNext={() => advVit('rr')} isLast={false}
-          lo={VIT_RANGES.rr[0]} hi={VIT_RANGES.rr[1]} />
-        <VitCell label="HR" value={vit.hr ?? ''} onChange={v => pV({ hr: v })}
+          lo={VIT_RANGES.rr[0]} hi={VIT_RANGES.rr[1]} maxLen={2} />
+        <VitCell label="HR" value={vit.hr ?? ''} prevValue={prevVit.hr} onChange={v => pV({ hr: v })}
           inputRef={r => { vitRefs.current.hr = r; }} onNext={() => advVit('hr')} isLast={false}
-          lo={VIT_RANGES.hr[0]} hi={VIT_RANGES.hr[1]} />
+          lo={VIT_RANGES.hr[0]} hi={VIT_RANGES.hr[1]} maxLen={3} />
         {/* BP — two inputs */}
         <View style={[s.vitCell, { flex: 2 }]}>
+          {(!!prevVit.bpS || !!prevVit.bpD) && (
+            <Text style={s.vitPrev}>
+              <Text style={{ color: prevVitColor(prevVit.bpS ?? '', 90, 120) }}>{prevVit.bpS ?? '—'}</Text>
+              <Text style={{ color: '#AAAAAA' }}>/</Text>
+              <Text style={{ color: prevVitColor(prevVit.bpD ?? '', 60, 80) }}>{prevVit.bpD ?? '—'}</Text>
+            </Text>
+          )}
           <Text style={s.vitLabel}>BP</Text>
           <View style={s.bpRow}>
             <TextInput
               ref={r => { vitRefs.current.bpS = r; }}
               style={[s.vitInput, { flex: 1, color: bpSColor }]}
-              value={vit.bpS ?? ''} onChangeText={v => pV({ bpS: v })}
+              value={vit.bpS ?? ''}
+              onChangeText={v => pV({ bpS: v })}
               keyboardType="number-pad" returnKeyType="next"
               onSubmitEditing={() => advVit('bpS')}
-              placeholder="sys" placeholderTextColor="#CCC" textAlign="center" maxLength={4} />
+              placeholder="sys" placeholderTextColor="#CCC" textAlign="center" maxLength={3} />
             <Text style={s.bpSlash}>/</Text>
             <TextInput
               ref={r => { vitRefs.current.bpD = r; }}
               style={[s.vitInput, { flex: 1, color: bpDColor }]}
-              value={vit.bpD ?? ''} onChangeText={v => pV({ bpD: v })}
+              value={vit.bpD ?? ''}
+              onChangeText={v => pV({ bpD: v })}
               keyboardType="number-pad" returnKeyType="done"
-              placeholder="dia" placeholderTextColor="#CCC" textAlign="center" maxLength={3} />
+              placeholder="dia" placeholderTextColor="#CCC" textAlign="center" maxLength={2} />
+          </View>
+        </View>
+        {/* O₂ */}
+        <View style={[s.vitCell, { flex: 2 }]}>
+          {!!prevVit.o2Mode && (
+            <Text style={s.vitPrev}>
+              {prevVit.o2Mode}{prevVit.o2Val ? ` ${prevVit.o2Val}` : ''}
+            </Text>
+          )}
+          <Text style={s.vitLabel} numberOfLines={1}>O₂</Text>
+          <View style={s.o2Row}>
+            <View style={s.o2PillsCol}>
+              {(['RA', 'NC', 'BiPAP'] as const).map(mode => (
+                <TouchableOpacity key={mode}
+                  style={[s.o2Pill, vit.o2Mode === mode && s.o2Active]}
+                  onPress={() => pV({ o2Mode: mode, o2Val: mode === 'RA' ? undefined : vit.o2Val })}>
+                  <Text style={[s.o2Text, vit.o2Mode === mode && s.o2TextActive]}>{mode}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {vit.o2Mode && vit.o2Mode !== 'RA' && (
+              <TextInput style={s.o2ValInput}
+                value={vit.o2Val ?? ''} onChangeText={v => { if (/^\d*\.?\d?$/.test(v)) pV({ o2Val: v }); }}
+                keyboardType="decimal-pad" returnKeyType="done"
+                placeholder={vit.o2Mode === 'NC' ? 'L/m' : 'IP/EP'}
+                placeholderTextColor="#CCC" textAlign="center" maxLength={5} />
+            )}
           </View>
         </View>
       </View>
 
-      {/* O₂ */}
-      <View style={s.o2Row}>
-        <Text style={s.vitLabel}>O₂</Text>
-        {(['RA', 'NC', 'BiPAP'] as const).map(mode => (
-          <TouchableOpacity key={mode}
-            style={[s.o2Pill, vit.o2Mode === mode && s.o2Active]}
-            onPress={() => pV({ o2Mode: mode, o2Val: mode === 'RA' ? undefined : vit.o2Val })}>
-            <Text style={[s.o2Text, vit.o2Mode === mode && s.o2TextActive]}>{mode}</Text>
-          </TouchableOpacity>
-        ))}
-        {vit.o2Mode && vit.o2Mode !== 'RA' && (
-          <TextInput style={s.o2Input}
-            value={vit.o2Val ?? ''} onChangeText={v => pV({ o2Val: v })}
-            keyboardType="decimal-pad" returnKeyType="done"
-            placeholder={vit.o2Mode === 'NC' ? 'L/min' : 'IPAP/EPAP'}
-            placeholderTextColor="#CCC" textAlign="center" maxLength={5} />
-        )}
-      </View>
-
       {/* ── Physical Exam ───────────────── */}
       <Text style={s.secTitle}>Physical Exam</Text>
-      <TextInput style={s.note} value={local.pe ?? ''} onChangeText={v => patch({ pe: v })}
-        multiline placeholder="Exam findings…" placeholderTextColor="#CCC" />
+      <ExamCard
+        examFindings={hp.examFindings ?? {}}
+        peNote={local.peNote ?? ''}
+        onPeNoteChange={v => patch({ peNote: v })}
+        onPress={() => navigation.navigate('ExamBuilder', { patientId })}
+      />
 
       {/* ── Labs ────────────────────────── */}
       <Text style={s.secTitle}>Labs</Text>
 
-      <Text style={s.fishTitle}>CBC</Text>
-      <CBCFishbone labs={labs} labRefs={labRefs} patchLab={pL} advance={advLab} />
+      <View style={s.fishHeader}>
+        <Text style={s.fishTitle}>CBC</Text>
+        <TouchableOpacity onPress={advanceCBC} style={s.advBtn}>
+          <Text style={s.advBtnText}>Adv →</Text>
+        </TouchableOpacity>
+      </View>
+      <CBCFishbone labs={labs} prevLabs={prevLabs} labRefs={labRefs} patchLab={pL} advance={advLab} />
 
-      <Text style={[s.fishTitle, { marginTop: 14 }]}>BMP / Chem</Text>
-      <BMPFishbone labs={labs} labRefs={labRefs} patchLab={pL} advance={advLab} />
+      <View style={[s.fishHeader, { marginTop: 10 }]}>
+        <Text style={s.fishTitle}>BMP</Text>
+        <TouchableOpacity onPress={advanceBMP} style={s.advBtn}>
+          <Text style={s.advBtnText}>Adv →</Text>
+        </TouchableOpacity>
+      </View>
+      <BMPFishbone labs={labs} prevLabs={prevLabs} labRefs={labRefs} patchLab={pL} advance={advLab} />
 
-      {/* ── Diagnostics ─────────────────── */}
-      <Text style={s.secTitle}>Diagnostics</Text>
-      <TextInput style={s.note} value={local.diagnostics ?? ''} onChangeText={v => patch({ diagnostics: v })}
-        multiline placeholder="Imaging, EKG, procedures…" placeholderTextColor="#CCC" />
+      <View style={s.fishHeader}>
+        <Text style={s.fishTitle}>LFT / CMP</Text>
+        <TouchableOpacity onPress={advanceLFT} style={s.advBtn}>
+          <Text style={s.advBtnText}>Adv →</Text>
+        </TouchableOpacity>
+      </View>
+      <LFTFishbone labs={labs} prevLabs={prevLabs} labRefs={labRefs} patchLab={pL} advance={advLab} />
+
+      {/* ── Diagnostics / Imaging ───────── */}
+      <Text style={s.secTitle}>Imaging</Text>
+      <DiagnosticsInput
+        studies={local.imagingStudies ?? []}
+        onChange={studies => patch({ imagingStudies: studies })}
+      />
 
       {/* ── A/P ─────────────────────────── */}
       <Text style={s.secTitle}>Assessment / Plan</Text>
-      <TextInput style={[s.note, { minHeight: 120 }]} value={local.ap ?? ''} onChangeText={v => patch({ ap: v })}
-        multiline placeholder="Assessment and plan…" placeholderTextColor="#CCC" />
+      <View ref={apRef}>
+        <APInput
+          value={local.ap ?? ''}
+          onChange={v => patch({ ap: v })}
+          hp={local}
+          placeholder="Assessment and plan…"
+          onFocused={() => centerInput(apRef.current)}
+        />
+      </View>
 
     </ScrollView>
   );
@@ -182,20 +450,38 @@ export default function HAndPSection({ hp, onUpdate }: Props) {
 
 const s = StyleSheet.create({
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingBottom: 48 },
+  content: { paddingHorizontal: 16, paddingBottom: 110 },
   secTitle: { fontSize: 12, fontWeight: '600', color: '#999', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 8 },
-  fishTitle: { fontSize: 11, fontWeight: '600', color: '#BBB', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  labsRow:    { flexDirection: 'row', gap: 8 },
+  labsCol:    { flex: 1 },
+  fishHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  fishTitle:  { fontSize: 11, fontWeight: '600', color: '#BBB', textTransform: 'uppercase', letterSpacing: 0.5 },
+  advBtn:     { backgroundColor: '#F0F0F0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  advBtnText: { fontSize: 11, fontWeight: '600', color: '#666' },
   note: { backgroundColor: BG, borderRadius: 12, borderWidth: 0.5, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#1C1C1E', minHeight: 80, textAlignVertical: 'top' },
+  vitSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },
   vitRow:   { flexDirection: 'row', gap: 8 },
   vitCell:  { flex: 1, alignItems: 'center' },
+  vitPrev:  { fontSize: 11, fontStyle: 'italic', color: '#AAAAAA', marginBottom: 2, fontVariant: ['tabular-nums'] },
   vitLabel: { fontSize: 10, fontWeight: '600', color: '#999', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 },
   vitInput: { backgroundColor: BG, borderRadius: 10, borderWidth: 0.5, borderColor: BORDER, paddingVertical: 10, fontSize: 15, width: '100%' },
   bpRow:    { flexDirection: 'row', alignItems: 'center', gap: 3, width: '100%' },
   bpSlash:  { fontSize: 18, color: '#BBB', fontWeight: '300' },
-  o2Row:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  o2Pill:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F0F0F0' },
+  o2Row:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  o2PillsCol:  { flexDirection: 'column', gap: 2, alignItems: 'flex-start' },
+  o2Pill:      { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, backgroundColor: '#F0F0F0' },
   o2Active:    { backgroundColor: '#1C1C1E' },
-  o2Text:      { fontSize: 13, fontWeight: '500', color: '#555' },
+  o2Text:      { fontSize: 10, fontWeight: '500', color: '#555' },
   o2TextActive:{ color: '#fff' },
-  o2Input:     { flex: 1, backgroundColor: BG, borderRadius: 10, borderWidth: 0.5, borderColor: BORDER, paddingVertical: 8, fontSize: 15, color: '#1C1C1E' },
+  o2ValInput:  { backgroundColor: BG, borderRadius: 8, borderWidth: 0.5, borderColor: BORDER, paddingVertical: 6, fontSize: 12, color: '#1C1C1E', width: 40, textAlign: 'center' },
+  // Exam display card
+  examCard:         { backgroundColor: BG, borderRadius: 12, borderWidth: 0.5, borderColor: BORDER, padding: 14 },
+  examChips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  examChipPos:      { backgroundColor: '#FFEBEE', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: '#EF9A9A' },
+  examChipPosText:  { fontSize: 12, fontWeight: '500', color: '#C62828' },
+  examChipNeg:      { backgroundColor: '#E8F5E9', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: '#A5D6A7' },
+  examChipNegText:  { fontSize: 12, fontWeight: '500', color: '#2E7D32' },
+  examPlaceholder:  { fontSize: 14, color: '#CCC', textAlign: 'center', paddingVertical: 6 },
+  examEditHint:     { fontSize: 11, color: '#BBB', textAlign: 'right', marginTop: 8 },
+  examExtraInput:   { marginTop: 10, borderTopWidth: 0.5, borderTopColor: '#EBEBEB', paddingTop: 8, fontSize: 13, color: '#1C1C1E', minHeight: 36 },
 });

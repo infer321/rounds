@@ -2,7 +2,7 @@
   "expo": {
     "name": "rounds",
     "slug": "rounds",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,9 +13,17 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.infer321.rounds",
+      "buildNumber": "5",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "Rounds uses Face ID to protect patient data."
+      }
     },
     "android": {
+      "package": "com.infer321.rounds",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +33,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a38d533b-8873-4479-9da2-330ba86311a3"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-local-authentication"
+    ]
   }
 }

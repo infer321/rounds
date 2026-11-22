@@ -11,17 +11,38 @@ export type Labs = {
   wbc?: string; hgb?: string; hct?: string; plt?: string;
   na?: string; k?: string; cl?: string; co2?: string;
   bun?: string; cr?: string; glu?: string;
+  // LFT / CMP
+  ca?: string; po4?: string; tp?: string; alb?: string;
+  ast?: string; alt?: string; ldh?: string; ap?: string; bili?: string;
+};
+
+export type ImagingStudy = {
+  id: string;
+  modality: string;   // 'XR' | 'CT' | 'MRI' | 'US'
+  bodyPart: string;   // e.g. 'Brain', 'Abdomen/Pelvis'
+  laterality?: string; // 'Right' | 'Left' | 'Bilateral'
+  findings: string;
 };
 
 export type HAndP = {
   hpi?: string;
   course?: string;
   vitals?: Vitals;
-  pe?: string;
+  prevVitals?: Vitals;   // previous vitals — shown faded above each cell
+  pe?: string;           // legacy free-text (kept for migration)
   labs?: Labs;
-  diagnostics?: string;
+  prevLabs?: Labs;       // yesterday's labs — shown faded top-left of each cell
+  imagingStudies?: ImagingStudy[];
+  diagnostics?: string;  // kept for backward-compat / extra notes
   ap?: string;
   subjective?: string;   // SOAP S section
+  // Structured physical exam (built in ExamBuilderScreen)
+  examFindings?: Record<string, 'pos' | 'neg'>;
+  examNotes?: Record<string, string>;
+  peNote?: string;            // free-text addendum shown at bottom of exam card
+  // Review of systems (built in ROSBuilderScreen)
+  rosFindings?: Record<string, 'pos' | 'neg'>;
+  rosNote?: string;           // free-text addendum shown at bottom of ROS card
 };
 
 export type Item = {
