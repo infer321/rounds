@@ -83,7 +83,7 @@ export default function AddItemSheet({ patientId, visible, onClose }: { patientI
         {type === 'timer' && <View style={st.gap}><DurationPicker hours={h} minutes={m} onHoursChange={setH} onMinutesChange={setM} /></View>}
 
         <Pressable style={st.flagRow} onPress={() => { tap(); setFlag(f => !f); }}>
-          <View style={[st.box, flag && st.boxOn]}>{flag && <Icon name="check" size={14} color="#fff" strokeWidth={2.5} />}</View>
+          <View style={[st.box, flag && st.boxOn]}>{flag && <Icon name="check" size={14} color={C.onInk} strokeWidth={2.5} />}</View>
           <Text style={T.body}>Add to signout</Text>
         </Pressable>
       </ScrollView>

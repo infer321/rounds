@@ -4,7 +4,7 @@
  * writes through patchHP, so builders, Complete round and typing can't
  * overwrite each other with a stale local copy.
  */
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
@@ -24,7 +24,8 @@ import LabsSection from './note/LabsSection';
 import { Section, SmallBtn } from './note/Section';
 import TrendsSheet from './note/TrendsSheet';
 import DiagnosticsInput from './DiagnosticsInput';
-import APInput from './APInput';
+import APSection from './note/APSection';
+import DailySection from './note/DailySection';
 import Icon from './Icon';
 import { C, T, R, S } from '../theme';
 
@@ -38,7 +39,6 @@ export default function NoteEditor({ patient, mode }: { patient: Patient; mode: 
   const { patchHP, advancePanel, completeRound } = usePatients();
   const toast = useToast();
   const { scrollRef, scrollProps, centerInput } = useScrollToCenter();
-  const apRef = useRef<View>(null);
   const [trends, setTrends] = useState(false);
 
   const pid = patient.id;
@@ -84,7 +84,7 @@ export default function NoteEditor({ patient, mode }: { patient: Patient; mode: 
       >
         <View style={st.actions}>
           <Pressable onPress={copyNote} style={({ pressed }) => [st.primary, pressed && { opacity: 0.85 }]}>
-            <Icon name="copy" size={16} color="#fff" strokeWidth={2} />
+            <Icon name="copy" size={16} color={C.onInk} strokeWidth={2} />
             <Text style={st.primaryText}>Copy {mode === 'hp' ? 'H&P' : 'SOAP'}</Text>
           </Pressable>
           <Pressable onPress={complete} disabled={!anyToAdvance}
@@ -138,17 +138,9 @@ export default function NoteEditor({ patient, mode }: { patient: Patient; mode: 
           <DiagnosticsInput studies={hp.imagingStudies ?? []} onChange={studies => patch({ imagingStudies: studies })} />
         </Section>
 
-        <Section title="Assessment & plan">
-          <View ref={apRef}>
-            <APInput
-              value={hp.ap ?? ''}
-              onChange={v => patch({ ap: v })}
-              hp={hp}
-              placeholder={'# Problem\n- plan'}
-              onFocused={() => centerInput(apRef.current)}
-            />
-          </View>
-        </Section>
+        <DailySection patient={patient} />
+
+        <APSection patient={patient} onCenter={centerInput} />
       </ScrollView>
       <TrendsSheet hp={hp} visible={trends} onClose={() => setTrends(false)} />
     </>
@@ -159,7 +151,7 @@ const st = StyleSheet.create({
   content: { paddingHorizontal: S.lg, paddingBottom: 140, paddingTop: S.sm },
   actions: { flexDirection: 'row', gap: S.sm, marginBottom: S.sm },
   primary: { flex: 1, flexDirection: 'row', gap: S.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.ink, borderRadius: R.md, paddingVertical: 12 },
-  primaryText: { ...T.bodyM, color: '#fff' },
+  primaryText: { ...T.bodyM, color: C.onInk },
   secondary: { flex: 1, flexDirection: 'row', gap: S.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface, borderWidth: 0.5, borderColor: C.lineStrong, borderRadius: R.md, paddingVertical: 12 },
   secondaryText: { ...T.bodyM },
 });

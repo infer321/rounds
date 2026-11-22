@@ -1,0 +1,17 @@
+appId: com.infer321.rounds
+name: I-PASS signout copy + eye consult copy
+---
+- launchApp:
+    clearState: true
+- tapOn: "Next"
+- tapOn: "Next"
+- tapOn: "Try a demo patient"
+- tapOn: "Eye"
+- tapOn: "Normal OU"
+- tapOn: "Copy ophthalmology consult"
+- assertVisible: "Ophthalmology consult copied.*"
+- back
+- tapOn: "Signout"
+- assertVisible: "Watcher"
+- tapOn: "Copy signout"
+- assertVisible: "I-PASS signout copied.*"

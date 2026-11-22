@@ -391,7 +391,7 @@ const st = StyleSheet.create({
     color: C.ink2,
   },
   pillPrimaryText: {
-    color: '#fff',
+    color: C.onInk,
   },
 
   // Next-study quick-start row (shown while typing findings)

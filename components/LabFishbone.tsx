@@ -8,9 +8,9 @@ import { View, Text, TextInput, Pressable, StyleSheet, LayoutChangeEvent } from 
 import Svg, { Line } from 'react-native-svg';
 import { Labs } from '../data/patients';
 import { LabKey, LAB_LABEL, LAB_MAXLEN, NUMERIC_RE, labFlag, Flag } from '../utils/clinical';
-import { C, T, R } from '../theme';
+import { C, T, R, useColor } from '../theme';
+import Icon from './Icon';
 
-const STROKE = C.lineStrong;
 const SW = 1.25;
 
 export const flagColor = (f: Flag, faded = false) =>
@@ -30,9 +30,14 @@ function Cell({ k, value, prev, onChange, inputRef, onNext, isLast, style }: {
 }) {
   const ref = useRef<TextInput | null>(null);
   const f = labFlag(k, value);
+  const a = parseFloat(value), b = parseFloat(prev ?? '');
+  const trend: 'up' | 'down' | null = !isNaN(a) && !isNaN(b) && a !== b ? (a > b ? 'up' : 'down') : null;
   return (
     <Pressable style={[st.cell, style]} onPress={() => ref.current?.focus()}>
-      <Text style={[st.prev, { color: flagColor(labFlag(k, prev), true) }]} numberOfLines={1}>{prev ?? ' '}</Text>
+      <View style={st.prevRow}>
+        <Text style={[st.prev, { color: flagColor(labFlag(k, prev), true) }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{prev ?? ' '}</Text>
+        {trend && <Icon name={trend} size={10} color={C.ink3} strokeWidth={2.25} />}
+      </View>
       <TextInput
         ref={r => { ref.current = r; inputRef(r); }}
         style={[st.input, { color: flagColor(f) }]}
@@ -47,7 +52,8 @@ function Cell({ k, value, prev, onChange, inputRef, onNext, isLast, style }: {
         textAlign="center"
         selectTextOnFocus
         maxLength={LAB_MAXLEN[k]}
-        accessibilityLabel={LAB_LABEL[k]}
+        maxFontSizeMultiplier={1.2}
+        accessibilityLabel={`${LAB_LABEL[k]}${prev ? `, previous ${prev}` : ''}`}
       />
       {!!value && <Text style={st.unitLabel}>{LAB_LABEL[k]}</Text>}
     </Pressable>
@@ -76,6 +82,7 @@ const abs = (left: number, top: number, width: number, height: number) => ({ pos
 //   /   Hct   \
 function CBCFishboneBase(props: FishProps) {
   const { w, onLayout } = useWidth();
+  const STROKE = useColor()(C.lineStrong);
   const cx1 = w * 0.3, cx2 = w * 0.7, cy = H / 2, inset = w * 0.05;
   const c = cellFactory(props);
   return (
@@ -105,6 +112,7 @@ function CBCFishboneBase(props: FishProps) {
  */
 function SplitFishboneBase(props: FishProps & { top: LabKey[]; bottom: LabKey[]; tail: LabKey }) {
   const { w, onLayout } = useWidth();
+  const STROKE = useColor()(C.lineStrong);
   const { top, bottom, tail } = props;
   const c = cellFactory(props);
   const cols = top.length;
@@ -156,6 +164,7 @@ const st = StyleSheet.create({
   rowCell: { flex: 1 },
   rowDivider: { borderLeftWidth: 0.5, borderLeftColor: C.line },
   cell: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  prevRow: { flexDirection: 'row', alignItems: 'center', gap: 1, height: 14 },
   prev: { ...T.caption, ...T.num, fontSize: 11, fontWeight: '400', height: 14 },
   input:{ fontSize: 17, fontWeight: '600', ...T.num, minWidth: 44, paddingVertical: 2 },
   unitLabel: { fontSize: 9, fontWeight: '600', color: C.ink4, letterSpacing: 0.3, height: 12 },

@@ -1,0 +1,11 @@
+appId: com.infer321.rounds
+name: First run → demo patient → copy H&P
+---
+- launchApp:
+    clearState: true
+- tapOn: "Next"
+- tapOn: "Next"
+- tapOn: "Try a demo patient"
+- assertVisible: "Copy H&P"
+- tapOn: "Copy H&P"
+- assertVisible: "H&P copied.*"

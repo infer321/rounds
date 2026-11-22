@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import Icon from '../Icon';
+import Icon, { IconName } from '../Icon';
 import { C, T, R, S } from '../../theme';
 
 export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
@@ -15,7 +15,7 @@ export function Section({ title, action, children }: { title: string; action?: R
   );
 }
 
-export function SmallBtn({ label, onPress, icon, disabled }: { label: string; onPress: () => void; icon?: 'trend' | 'copy' | 'check'; disabled?: boolean }) {
+export function SmallBtn({ label, onPress, icon, disabled }: { label: string; onPress: () => void; icon?: IconName; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} hitSlop={8}
       style={({ pressed }) => [st.smallBtn, pressed && { backgroundColor: C.sunken }, disabled && { opacity: 0.35 }]}>

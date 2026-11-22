@@ -44,5 +44,5 @@ const st = StyleSheet.create({
   tab: { flex: 1, alignItems: 'center', gap: 3 },
   label: { ...T.caption, fontSize: 11, color: C.ink3 },
   badge: { position: 'absolute', top: -4, right: -10, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: C.flag, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  badgeText: { color: C.onInk, fontSize: 10, fontWeight: '700' },
 });

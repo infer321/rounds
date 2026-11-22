@@ -16,7 +16,7 @@ export function Screen({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[ui.screen, { paddingTop: insets.top + S.sm }]}>
-      <StatusBar style="dark" />
+      <StatusBar style="auto" />
       {children}
     </View>
   );

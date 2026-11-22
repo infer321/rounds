@@ -16,6 +16,7 @@ import { useKbCtx } from '../context/KeyboardContext';
 import { HAndP } from '../data/patients';
 import { useBufferedText } from '../hooks/useBufferedText';
 import { suggestionsFor } from '../utils/apSuggestions';
+import { useSettings } from '../context/SettingsContext';
 import { C, R, S } from '../theme';
 
 const FONT_SIZE = 15;
@@ -43,6 +44,9 @@ function Lines({ text, placeholder }: { text: string; placeholder?: string }) {
 
 export default function APInput({ value, onChange, hp, placeholder, onFocused }: Props) {
   const { registerInsert, setSuggestions, setExtraKeys } = useKbCtx();
+  const { phrases } = useSettings();
+  const phrasesRef = useRef(phrases);
+  phrasesRef.current = phrases;
   const buf = useBufferedText(value, onChange, 1200);
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -58,7 +62,7 @@ export default function APInput({ value, onChange, hp, placeholder, onFocused }:
     text.current = next;
     sel.current = { start: caret, end: caret };
     setText(next);
-    setSuggestions(suggestionsFor(next, caret, hpRef.current));
+    setSuggestions(suggestionsFor(next, caret, hpRef.current, phrasesRef.current));
     const n = next.split('\n').length;
     if (n > lineCount.current) onFocused?.();
     lineCount.current = n;
@@ -82,7 +86,7 @@ export default function APInput({ value, onChange, hp, placeholder, onFocused }:
   function onFocus() {
     buf.onFocus();
     registerInsert(insert);
-    setExtraKeys(['#', '-']);
+    setExtraKeys(['#', '-', '.']);
     lineCount.current = text.current.split('\n').length;
     onFocused?.();
   }
@@ -96,7 +100,7 @@ export default function APInput({ value, onChange, hp, placeholder, onFocused }:
 
   if (!editing) {
     return (
-      <Pressable style={st.box} onPress={() => setEditing(true)}>
+      <Pressable style={st.box} onPress={() => setEditing(true)} accessibilityRole="button" accessibilityLabel="Edit assessment and plan">
         <View style={st.pad}><Lines text={buf.text} placeholder={placeholder} /></View>
       </Pressable>
     );

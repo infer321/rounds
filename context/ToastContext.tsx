@@ -56,6 +56,6 @@ export const useToast = () => useContext(Ctx);
 const st = StyleSheet.create({
   wrap:  { position: 'absolute', left: S.lg, right: S.lg, alignItems: 'center', zIndex: 9000 },
   toast: { flexDirection: 'row', alignItems: 'center', gap: S.lg, backgroundColor: C.ink, borderRadius: R.md, paddingHorizontal: S.lg, paddingVertical: 12, maxWidth: 480, alignSelf: 'stretch' },
-  msg:   { ...T.small, color: '#fff', flex: 1 },
-  undo:  { ...T.bodyM, color: '#fff', textDecorationLine: 'underline' },
+  msg:   { ...T.small, color: C.onInk, flex: 1 },
+  undo:  { ...T.bodyM, color: C.onInk, textDecorationLine: 'underline' },
 });

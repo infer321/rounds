@@ -22,10 +22,16 @@ Clinical workflow app for med students/residents. React Native 0.81 + Expo SDK 5
 - `components/NoteEditor.tsx` + `components/note/` — H&P and SOAP tabs (one component, `mode` prop)
 - `components/TimersTab.tsx` + `components/timers/` — owns the 1s clock; keep `useNow` out of note screens
 - `components/FindingsBuilder.tsx` — exam + ROS builders
+- `components/EyeTab.tsx` — ophthalmology consult (OD/OS grid); export in `noteExport.buildEyeConsult`
+- `components/note/DailySection.tsx` — daily checklist + antibiotic days (`utils/abx.ts`)
+- `utils/labParse.ts` — paste-to-fill labs; `utils/phrases.ts` — dot phrases
+- Dark mode: theme tokens are DynamicColorIOS. SVG must use `useColor()` to get a hex
 
 ## Performance rules
 - Long text fields buffer locally (`useBufferedText`) and commit on pause/blur/background. Never write to context per keystroke.
 - Text fields use `useKbCtx()` (stable actions). Only the toolbar reads `useKbState()`.
 
 ## Checks before shipping
-`npx tsc --noEmit` and `npx expo export --platform ios --output-dir /tmp/exp`
+- `npm test` (logic tests in `tests/`) and `npm run typecheck`
+- `npx expo export --platform ios --output-dir /tmp/exp` (bundle builds)
+- `maestro test .maestro` (tap-through flows; simulator + dev build)

@@ -3,10 +3,11 @@
  * Output is plain ASCII-ish text that survives Teams → Cerner paste:
  * no markdown, no tabs, H/L tags instead of color.
  */
-import { HAndP, Labs, Patient, Vitals } from '../data/patients';
+import { EyeExam, EyePair, HAndP, Labs, Patient, Vitals } from '../data/patients';
+import { abxDay } from './abx';
 import { EXAM_SECTIONS } from '../data/examSections';
 import { ROS_SECTIONS } from '../data/rosSections';
-import { LAB_LABEL, LabKey, PANELS, labFlag, vitFlag, VitKey } from './clinical';
+import { LAB_LABEL, LabKey, PANELS, labFlag, vitFlag, VitKey, flagOf, IOP_RANGE } from './clinical';
 
 const tag = (f: 'H' | 'L' | null) => (f ? ` (${f})` : '');
 const join = (parts: (string | undefined | false | null)[], sep = ' | ') => parts.filter(Boolean).join(sep);
@@ -98,6 +99,17 @@ export function imagingLines(hp: HAndP): string[] {
   });
 }
 
+export function dailyLines(hp: HAndP, now = Date.now()): string[] {
+  const d = hp.daily ?? {};
+  const out: string[] = [];
+  const first = [d.diet && `Diet: ${d.diet}`, d.vte && `VTE ppx: ${d.vte}`, d.code && `Code: ${d.code}`].filter(Boolean);
+  if (first.length) out.push(first.join(' | '));
+  if (d.lines?.trim()) out.push(`Lines/drains: ${d.lines.trim()}`);
+  if (hp.abx?.length) out.push(`Abx: ${hp.abx.map(a => `${a.name} D${abxDay(a.start, now)}`).join(', ')}`);
+  if (d.dispo?.trim()) out.push(`Dispo: ${d.dispo.trim()}`);
+  return out;
+}
+
 function block(title: string, body: string | string[] | undefined): string {
   const lines = Array.isArray(body) ? body : (body ?? '').trim() ? [(body ?? '').trim()] : [];
   return lines.length ? `${title}:\n${lines.join('\n')}` : '';
@@ -122,6 +134,7 @@ export function buildHP(p: Patient): string {
     block('ROS', rosLines(hp)),
     block('Hospital course', hp.course),
     ...objective(hp),
+    block('Daily', dailyLines(hp)),
     block('Assessment & Plan', hp.ap),
   ].filter(Boolean).join('\n\n');
 }
@@ -134,6 +147,7 @@ export function buildSOAP(p: Patient): string {
     `Progress note: ${oneLiner(p)}`,
     block('S', s),
     o.length ? `O:\n${o.join('\n\n')}` : '',
+    block('Daily', dailyLines(hp)),
     block('A/P', hp.ap),
   ].filter(Boolean).join('\n\n');
 }
@@ -145,20 +159,67 @@ function clock(ms: number): string {
   return `${h}:${m.toString().padStart(2, '0')} ${ap}`;
 }
 
+/** I-PASS signout for the whole list: severity, summary, action list, if/then. */
 export function buildSignout(patients: Patient[], now = Date.now()): string {
-  const groups = patients
-    .map(p => ({ p, items: p.items.filter(i => i.signout) }))
-    .filter(g => g.items.length);
-  if (!groups.length) return '';
+  if (!patients.length) return '';
   const d = new Date(now);
-  const header = `Signout ${d.getMonth() + 1}/${d.getDate()} ${clock(now)}`;
-  const body = groups.map(({ p, items }, n) => {
-    const lines = items.map(i => {
-      const due = i.type === 'timer' && i.endsAt
-        ? (i.endsAt <= now ? ' (overdue)' : ` (due ${clock(i.endsAt)})`) : '';
-      return `   - ${i.label}${due}`;
-    });
-    return `${n + 1}) ${p.initials} ${oneLiner(p)}\n${lines.join('\n')}`;
+  const header = `Signout (I-PASS) ${d.getMonth() + 1}/${d.getDate()} ${clock(now)}`;
+  const body = patients.map((p, n) => {
+    const ip = p.ipass ?? {};
+    const lines = [`${n + 1}) ${p.initials} ${oneLiner(p)}${ip.severity ? ` [${ip.severity}]` : ''}`];
+    if (ip.summary?.trim()) lines.push(`   Summary: ${ip.summary.trim()}`);
+    const todo = p.items.filter(i => i.signout);
+    if (todo.length) {
+      lines.push('   To do:');
+      todo.forEach(i => {
+        const due = i.type === 'timer' && i.endsAt ? (i.endsAt <= now ? ' (overdue)' : ` (due ${clock(i.endsAt)})`) : '';
+        lines.push(`   - ${i.label}${due}`);
+      });
+    }
+    if (ip.contingency?.trim()) lines.push(`   If/then: ${ip.contingency.trim()}`);
+    return lines.join('\n');
   });
   return [header, ...body].join('\n\n');
+}
+
+// ── Ophthalmology consult ────────────────────────────────────────────────
+
+/** "20/20 OU" when both eyes match, else "OD 20/25 | OS 20/40". */
+export function pair(p?: EyePair, fmt: (v: string) => string = v => v): string | undefined {
+  const od = p?.od?.trim(), os = p?.os?.trim();
+  if (!od && !os) return undefined;
+  if (od && od === os) return `${fmt(od)} OU`;
+  return [od && `OD ${fmt(od)}`, os && `OS ${fmt(os)}`].filter(Boolean).join(' | ');
+}
+
+const iopFmt = (v: string) => `${v}${tag(flagOf(v, IOP_RANGE))}`;
+
+export function eyeExamLines(e: EyeExam = {}): string[] {
+  const row = (label: string, v?: string) => (v ? `${label}: ${v}` : undefined);
+  const out = [
+    row(`VA ${e.vaMethod ?? 'cc'}`, pair(e.va)),
+    row('Pinhole', pair(e.ph)),
+    row(`IOP${e.iopMethod ? ` (${e.iopMethod})` : ''}`, pair(e.iop, iopFmt)),
+    row('Pupils', [pair(e.pupils), e.apd && (e.apd === 'None' ? 'no APD' : `APD ${e.apd}`)].filter(Boolean).join(', ') || undefined),
+    row('EOM', pair(e.eom)),
+    row('CVF', pair(e.cvf)),
+  ].filter(Boolean) as string[];
+  const sle = [['L/L', e.ll], ['C/S', e.cs], ['K', e.k], ['AC', e.ac], ['Iris', e.iris], ['Lens', e.lens]] as const;
+  const sleLines = sle.map(([l, v]) => row(`  ${l}`, pair(v))).filter(Boolean) as string[];
+  if (sleLines.length) out.push('SLE', ...sleLines);
+  const dfe = [['Disc', e.disc], ['Macula', e.mac], ['Vessels', e.vessels], ['Periphery', e.periph]] as const;
+  const dfeLines = dfe.map(([l, v]) => row(`  ${l}`, pair(v))).filter(Boolean) as string[];
+  if (dfeLines.length) out.push(e.dilated === false ? 'Fundus (undilated)' : 'DFE', ...dfeLines);
+  return out;
+}
+
+export function buildEyeConsult(p: Patient): string {
+  const hp = p.hp ?? {};
+  return [
+    `Ophthalmology consult: ${oneLiner(p)}`,
+    block('Reason for consult', hp.eye?.reason),
+    block('HPI', hp.hpi),
+    block('Exam', eyeExamLines(hp.eye)),
+    block('Assessment & Plan', hp.ap),
+  ].filter(Boolean).join('\n\n');
 }

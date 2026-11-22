@@ -37,14 +37,14 @@ export default function Sheet({ visible, onClose, title, subtitle, children, foo
   );
 }
 
-export function Btn({ label, onPress, kind = 'primary', disabled, flex = 1 }: {
-  label: string; onPress: () => void; kind?: 'primary' | 'secondary' | 'danger'; disabled?: boolean; flex?: number;
+export function Btn({ label, onPress, kind = 'primary', disabled, flex = 1, testID }: {
+  label: string; onPress: () => void; kind?: 'primary' | 'secondary' | 'danger'; disabled?: boolean; flex?: number; testID?: string;
 }) {
   const bg = kind === 'primary' ? C.ink : kind === 'danger' ? C.high : C.surface;
   return (
-    <Pressable onPress={onPress} disabled={disabled}
+    <Pressable onPress={onPress} disabled={disabled} testID={testID} accessibilityRole="button"
       style={({ pressed }) => [st.btn, { flex, backgroundColor: bg }, kind === 'secondary' && st.btnSecondary, pressed && { opacity: 0.85 }, disabled && { opacity: 0.35 }]}>
-      <Text style={[T.bodyM, { color: kind === 'secondary' ? C.ink : '#fff' }]}>{label}</Text>
+      <Text style={[T.bodyM, { color: kind === 'secondary' ? C.ink : C.onInk }]}>{label}</Text>
     </Pressable>
   );
 }

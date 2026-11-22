@@ -1,8 +1,12 @@
 import { useRef } from 'react';
+import * as Clipboard from 'expo-clipboard';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { Labs, PanelKey, Patient } from '../../data/patients';
 import { usePatients } from '../../context/PatientsContext';
 import { LAB_ORDER, LabKey, PANELS } from '../../utils/clinical';
+import { parseLabs } from '../../utils/labParse';
+import { useToast } from '../../context/ToastContext';
+import { success, warn } from '../../utils/haptics';
 import { CBCFishbone, BMPFishbone, LFTFishbone, LabRow } from '../LabFishbone';
 import NoteField from './NoteField';
 import { Section, SmallBtn } from './Section';
@@ -20,6 +24,7 @@ type Props = {
 
 export default function LabsSection({ patient, onAdvance, onTrends, onFocusField }: Props) {
   const { patchHP } = usePatients();
+  const toast = useToast();
   const refs = useRef<Partial<Record<LabKey, TextInput | null>>>({});
   const hp = patient.hp ?? {};
   const labs = hp.labs ?? NO_LABS;
@@ -33,6 +38,20 @@ export default function LabsSection({ patient, onAdvance, onTrends, onFocusField
     advance: (k: LabKey) => refs.current[LAB_ORDER[LAB_ORDER.indexOf(k) + 1]]?.focus(),
   };
 
+  async function paste() {
+    const text = await Clipboard.getStringAsync();
+    const { labs: found, count } = parseLabs(text ?? '');
+    if (!count) {
+      warn();
+      toast({ message: 'No labs found on the clipboard. Copy the lab results from the EMR first.' });
+      return;
+    }
+    const before = hp.labs;
+    patchHP(pid, h => ({ ...h, labs: { ...h.labs, ...found } }));
+    success();
+    toast({ message: `Filled ${count} lab${count === 1 ? '' : 's'} from clipboard`, onUndo: () => patchHP(pid, { labs: before }) });
+  }
+
   const head = (title: string, panel?: Panel) => (
     <View style={st.head}>
       <Text style={st.title}>{title}</Text>
@@ -41,7 +60,12 @@ export default function LabsSection({ patient, onAdvance, onTrends, onFocusField
   );
 
   return (
-    <Section title="Labs" action={<SmallBtn label="Trends" icon="trend" onPress={onTrends} />}>
+    <Section title="Labs" action={
+      <View style={st.actions}>
+        <SmallBtn label="Paste" icon="paste" onPress={paste} />
+        <SmallBtn label="Trends" icon="trend" onPress={onTrends} />
+      </View>
+    }>
       <View style={{ gap: S.lg }}>
         <View>{head('CBC', 'cbc')}<CBCFishbone {...fish} /></View>
         <View>{head('BMP', 'bmp')}<BMPFishbone {...fish} /></View>
@@ -58,6 +82,7 @@ export default function LabsSection({ patient, onAdvance, onTrends, onFocusField
 }
 
 const st = StyleSheet.create({
+  actions: { flexDirection: 'row', gap: S.sm },
   head:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, minHeight: 24 },
   title: { ...T.caption, color: C.ink2 },
 });

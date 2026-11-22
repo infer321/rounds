@@ -95,5 +95,5 @@ const st = StyleSheet.create({
   name:  { ...T.h2, marginBottom: S.lg },
   err:   { ...T.small, color: C.high },
   btn:   { backgroundColor: C.ink, borderRadius: R.md, paddingVertical: 14, alignSelf: 'stretch', alignItems: 'center' },
-  btnText: { ...T.bodyM, color: '#fff' },
+  btnText: { ...T.bodyM, color: C.onInk },
 });

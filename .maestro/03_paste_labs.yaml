@@ -1,0 +1,12 @@
+appId: com.infer321.rounds
+name: Paste labs from clipboard fills the BMP
+---
+- launchApp:
+    clearState: true
+- tapOn: "Next"
+- tapOn: "Next"
+- tapOn: "Try a demo patient"
+- setClipboard: "Sodium 141\nPotassium 4.4\nCreatinine 1.1"
+- tapOn: "Paste"
+- assertVisible: "Filled 3 labs.*"
+- assertVisible: "141"

@@ -28,7 +28,42 @@ export type Snapshot = {
   at: number;                 // epoch ms
   vitals?: Vitals;
   labs?: Labs;
+  ap?: string;                // A/P as it stood when the round was completed
+  subjective?: string;
 };
+
+/** Daily checklist. Values carry forward day to day. */
+export type Daily = {
+  diet?: string;
+  vte?: string;
+  code?: string;
+  lines?: string;
+  dispo?: string;
+};
+
+/** Antibiotic course; day count is derived from the start date. */
+export type Abx = { id: string; name: string; start: number /* local midnight, epoch ms */ };
+
+export type EyePair = { od?: string; os?: string };
+export type EyeExam = {
+  reason?: string;
+  vaMethod?: 'cc' | 'sc';
+  va?: EyePair;
+  ph?: EyePair;               // pinhole
+  iopMethod?: 'Tonopen' | 'iCare' | 'Applanation';
+  iop?: EyePair;
+  pupils?: EyePair;
+  apd?: 'None' | 'OD' | 'OS';
+  eom?: EyePair;
+  cvf?: EyePair;
+  ll?: EyePair; cs?: EyePair; k?: EyePair; ac?: EyePair; iris?: EyePair; lens?: EyePair;
+  dilated?: boolean;
+  disc?: EyePair; mac?: EyePair; vessels?: EyePair; periph?: EyePair;
+};
+
+export type Severity = 'Stable' | 'Watcher' | 'Unstable';
+/** I-PASS handoff fields (Illness severity, Patient summary, Action list, Situation awareness). */
+export type IPass = { severity?: Severity; summary?: string; contingency?: string };
 
 export type ImagingStudy = {
   id: string;
@@ -55,6 +90,9 @@ export type HAndP = {
   peNote?: string;
   rosFindings?: Record<string, 'pos' | 'neg'>;
   rosNote?: string;
+  daily?: Daily;
+  abx?: Abx[];
+  eye?: EyeExam;
   // legacy, kept so old saves still load
   pe?: string;
   diagnostics?: string;
@@ -82,4 +120,6 @@ export type Patient = {
   colorIndex: number;        // legacy, unused in UI
   items: Item[];
   hp?: HAndP;
+  ipass?: IPass;
+  updatedAt?: number;        // last edit (drives the stale-patient reminder)
 };
