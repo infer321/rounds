@@ -1,199 +1,164 @@
-import { useRef, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { memoData } from '../utils/memo';
+/**
+ * Lab entry diagrams. Values color red (high) / blue (low); yesterday's value
+ * sits faded above each cell. Return key walks LAB_ORDER across all panels.
+ */
+import { useRef, useState, MutableRefObject } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, LayoutChangeEvent } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import { Labs } from '../data/patients';
+import { LabKey, LAB_LABEL, LAB_MAXLEN, NUMERIC_RE, labFlag, Flag } from '../utils/clinical';
+import { C, T, R } from '../theme';
 
-const STROKE = '#555';
-const SW = 1.5;
-const BORDER = '#E0E0E0';
+const STROKE = C.lineStrong;
+const SW = 1.25;
 
-// ─── Reference ranges ─────────────────────────────────────────
-const RANGES: Record<keyof Labs, [number, number]> = {
-  wbc: [4.5,  11.0],
-  hgb: [12.0, 17.5],
-  hct: [35,   52],
-  plt: [150,  400],
-  na:  [136,  145],
-  k:   [3.5,  5.0],
-  cl:  [98,   106],
-  co2: [22,   29],
-  bun: [7,    20],
-  cr:  [0.6,  1.2],
-  glu: [70,   100],
+export const flagColor = (f: Flag, faded = false) =>
+  f === 'H' ? (faded ? C.highFaded : C.high) : f === 'L' ? (faded ? C.lowFaded : C.low) : (faded ? C.ink4 : C.ink);
+
+type Refs = MutableRefObject<Partial<Record<LabKey, TextInput | null>>>;
+type FishProps = {
+  labs: Labs; prevLabs?: Labs; labRefs: Refs;
+  patchLab: (k: LabKey, v: string) => void;
+  advance: (k: LabKey) => void;
 };
 
-function valueColor(val: string, lo: number, hi: number): string {
-  const n = parseFloat(val);
-  if (!val || isNaN(n)) return '#1C1C1E';
-  if (n > hi) return '#E24B4A';   // above → red
-  if (n < lo) return '#2471A3';   // below → blue
-  return '#1C1C1E';               // normal → dark
-}
-
-// ─── Fish cell ────────────────────────────────────────────────
-function Cell({
-  labKey, label, value, onChange, inputRef, onNext, isLast, style,
-}: {
-  labKey: keyof Labs;
-  label: string; value: string;
-  onChange: (v: string) => void;
-  inputRef: (r: TextInput | null) => void;
-  onNext: () => void; isLast: boolean;
-  style?: object;
+function Cell({ k, value, prev, onChange, inputRef, onNext, isLast, style }: {
+  k: LabKey; value: string; prev?: string;
+  onChange: (v: string) => void; inputRef: (r: TextInput | null) => void;
+  onNext: () => void; isLast: boolean; style?: object;
 }) {
-  const [lo, hi] = RANGES[labKey];
-  const col = valueColor(value, lo, hi);
-
+  const ref = useRef<TextInput | null>(null);
+  const f = labFlag(k, value);
   return (
-    <View style={[styles.cell, style]}>
-      <Text style={styles.cellLabel}>{label}</Text>
+    <Pressable style={[st.cell, style]} onPress={() => ref.current?.focus()}>
+      <Text style={[st.prev, { color: flagColor(labFlag(k, prev), true) }]} numberOfLines={1}>{prev ?? ' '}</Text>
       <TextInput
-        ref={inputRef}
-        style={[styles.cellInput, { color: col }]}
+        ref={r => { ref.current = r; inputRef(r); }}
+        style={[st.input, { color: flagColor(f) }]}
         value={value}
-        onChangeText={onChange}
+        onChangeText={t => { if (NUMERIC_RE.test(t)) onChange(t); }}
         keyboardType="decimal-pad"
         returnKeyType={isLast ? 'done' : 'next'}
         onSubmitEditing={isLast ? undefined : onNext}
-        placeholder="—"
-        placeholderTextColor="#CCC"
+        submitBehavior={isLast ? 'blurAndSubmit' : 'submit'}
+        placeholder={LAB_LABEL[k]}
+        placeholderTextColor={C.ink4}
         textAlign="center"
         selectTextOnFocus
-        maxLength={5}
+        maxLength={LAB_MAXLEN[k]}
+        accessibilityLabel={LAB_LABEL[k]}
       />
-    </View>
+      {!!value && <Text style={st.unitLabel}>{LAB_LABEL[k]}</Text>}
+    </Pressable>
   );
 }
 
-// ─── CBC fishbone ─────────────────────────────────────────────
-//
-//   \           Hgb          /
-//    X ─────────────────── X
-//   /           HCT          \
-//  WBC                      Plts
-//
-const CBC_H = 160;
-
-type CBCProps = {
-  labs: Labs;
-  labRefs: React.MutableRefObject<Partial<Record<keyof Labs, TextInput | null>>>;
-  patchLab: (k: keyof Labs, v: string) => void;
-  advance: (k: keyof Labs) => void;
-};
-
-export function CBCFishbone({ labs, labRefs, patchLab, advance }: CBCProps) {
+function useWidth() {
   const [w, setW] = useState(0);
-  const onLayout = (e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width);
+  return { w, onLayout: (e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width) };
+}
 
-  const cx1 = w * 0.28;
-  const cx2 = w * 0.72;
-  const cy  = CBC_H / 2;
-  const wingInset = w * 0.04;
-  const wing2 = w - wingInset;
-  const wingTop = 14;
-  const wingBot = CBC_H - 14;
-
-  const lc = (key: keyof Labs, label: string, style: object) => (
-    <Cell labKey={key} label={label}
-      value={labs[key] ?? ''} onChange={v => patchLab(key, v)}
-      inputRef={r => { labRefs.current[key] = r; }}
-      onNext={() => advance(key)} isLast={key === 'plt'}
-      style={style} />
+function cellFactory({ labs, prevLabs, labRefs, patchLab, advance }: FishProps, lastKey?: LabKey) {
+  return (k: LabKey, style: object) => (
+    <Cell key={k} k={k} value={labs[k] ?? ''} prev={prevLabs?.[k]}
+      onChange={v => patchLab(k, v)}
+      inputRef={r => { labRefs.current[k] = r; }}
+      onNext={() => advance(k)} isLast={k === lastKey} style={style} />
   );
+}
 
+const H = 132;
+const abs = (left: number, top: number, width: number, height: number) => ({ position: 'absolute', left, top, width, height });
+
+//   \   Hgb   /
+//  WBC ───── Plt
+//   /   Hct   \
+function CBCFishboneBase(props: FishProps) {
+  const { w, onLayout } = useWidth();
+  const cx1 = w * 0.3, cx2 = w * 0.7, cy = H / 2, inset = w * 0.05;
+  const c = cellFactory(props);
   return (
-    <View style={[styles.diagramBox, { height: CBC_H }]} onLayout={onLayout}>
-      {w > 0 && (
-        <>
-          <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-            <Line x1={cx1} y1={cy} x2={cx2} y2={cy} stroke={STROKE} strokeWidth={SW} />
-            <Line x1={wingInset} y1={wingTop} x2={cx1} y2={cy} stroke={STROKE} strokeWidth={SW} />
-            <Line x1={wingInset} y1={wingBot} x2={cx1} y2={cy} stroke={STROKE} strokeWidth={SW} />
-            <Line x1={cx2} y1={cy} x2={wing2} y2={wingTop} stroke={STROKE} strokeWidth={SW} />
-            <Line x1={cx2} y1={cy} x2={wing2} y2={wingBot} stroke={STROKE} strokeWidth={SW} />
-          </Svg>
-
-          {lc('wbc', 'WBC', { position: 'absolute', left: 2, top: cy - 30, width: cx1 - 6 })}
-          {lc('hgb', 'Hgb', { position: 'absolute', left: cx1 + 6, top: 8, width: cx2 - cx1 - 12, alignItems: 'center' })}
-          {lc('hct', 'HCT', { position: 'absolute', left: cx1 + 6, top: cy + 10, width: cx2 - cx1 - 12, alignItems: 'center' })}
-          {lc('plt', 'Plts', { position: 'absolute', right: 2, top: cy - 30, width: w - cx2 - 6 })}
-        </>
-      )}
+    <View style={[st.box, { height: H }]} onLayout={onLayout}>
+      {w > 0 && <>
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Line x1={cx1} y1={cy} x2={cx2} y2={cy} stroke={STROKE} strokeWidth={SW} />
+          <Line x1={inset} y1={14} x2={cx1} y2={cy} stroke={STROKE} strokeWidth={SW} />
+          <Line x1={inset} y1={H - 14} x2={cx1} y2={cy} stroke={STROKE} strokeWidth={SW} />
+          <Line x1={cx2} y1={cy} x2={w - inset} y2={14} stroke={STROKE} strokeWidth={SW} />
+          <Line x1={cx2} y1={cy} x2={w - inset} y2={H - 14} stroke={STROKE} strokeWidth={SW} />
+        </Svg>
+        {c('wbc', abs(0, 0, cx1, H))}
+        {c('hgb', abs(cx1, 0, cx2 - cx1, cy))}
+        {c('hct', abs(cx1, cy, cx2 - cx1, H - cy))}
+        {c('plt', abs(cx2, 0, w - cx2, H))}
+      </>}
     </View>
   );
 }
 
-// ─── BMP fishbone ─────────────────────────────────────────────
-//
-//   Na⁺  |   Cl⁻  |  BUN  \
-//   ──────────────────────── > Glu
-//   K⁺   |  HCO₃  |   Cr  /
-//
-const BMP_H = 160;
-
-type BMPProps = {
-  labs: Labs;
-  labRefs: React.MutableRefObject<Partial<Record<keyof Labs, TextInput | null>>>;
-  patchLab: (k: keyof Labs, v: string) => void;
-  advance: (k: keyof Labs) => void;
-};
-
-export function BMPFishbone({ labs, labRefs, patchLab, advance }: BMPProps) {
-  const [w, setW] = useState(0);
-  const onLayout = (e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width);
-
-  const cy       = BMP_H / 2;
-  const lineEnd  = w * 0.74;
-  const v1       = w * 0.27;
-  const v2       = w * 0.52;
-  const vTop     = 12;
-  const vBot     = BMP_H - 12;
-  const tailX    = w * 0.74;
-  const tailOutX = w * 0.95;
-  const gluX     = w * 0.76;
-
-  const lc = (key: keyof Labs, label: string, style: object) => (
-    <Cell labKey={key} label={label}
-      value={labs[key] ?? ''} onChange={v => patchLab(key, v)}
-      inputRef={r => { labRefs.current[key] = r; }}
-      onNext={() => advance(key)} isLast={key === 'glu'}
-      style={style} />
-  );
-
+/**
+ * Split fishbone used by BMP and CMP/LFT:
+ *   top[0] | top[1] | … \
+ *   ─────────────────────  tail
+ *   bot[0] | bot[1] | … /
+ */
+function SplitFishboneBase(props: FishProps & { top: LabKey[]; bottom: LabKey[]; tail: LabKey }) {
+  const { w, onLayout } = useWidth();
+  const { top, bottom, tail } = props;
+  const c = cellFactory(props);
+  const cols = top.length;
+  const tailX = w * (1 - 1 / (cols + 1));          // tail gets one column's width
+  const colW = tailX / cols;
+  const cy = H / 2;
   return (
-    <View style={[styles.diagramBox, { height: BMP_H }]} onLayout={onLayout}>
-      {w > 0 && (
-        <>
-          <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-            <Line x1={0}       y1={cy}  x2={lineEnd} y2={cy}     stroke={STROKE} strokeWidth={SW} />
-            <Line x1={v1}      y1={vTop} x2={v1}     y2={vBot}   stroke={STROKE} strokeWidth={SW} />
-            <Line x1={v2}      y1={vTop} x2={v2}     y2={vBot}   stroke={STROKE} strokeWidth={SW} />
-            <Line x1={tailX}   y1={cy}  x2={tailOutX} y2={8}     stroke={STROKE} strokeWidth={SW} />
-            <Line x1={tailX}   y1={cy}  x2={tailOutX} y2={BMP_H - 8} stroke={STROKE} strokeWidth={SW} />
-          </Svg>
+    <View style={[st.box, { height: H }]} onLayout={onLayout}>
+      {w > 0 && <>
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Line x1={0} y1={cy} x2={tailX} y2={cy} stroke={STROKE} strokeWidth={SW} />
+          {top.slice(1).map((_, i) => {
+            const x = colW * (i + 1);
+            return <Line key={x} x1={x} y1={12} x2={x} y2={H - 12} stroke={STROKE} strokeWidth={SW} />;
+          })}
+          <Line x1={tailX} y1={cy} x2={w * 0.96} y2={10} stroke={STROKE} strokeWidth={SW} />
+          <Line x1={tailX} y1={cy} x2={w * 0.96} y2={H - 10} stroke={STROKE} strokeWidth={SW} />
+        </Svg>
+        {top.map((k, i) => c(k, abs(colW * i, 0, colW, cy)))}
+        {bottom.map((k, i) => c(k, abs(colW * i, cy, colW, H - cy)))}
+        {c(tail, abs(tailX, 0, w - tailX, H))}
+      </>}
+    </View>
+  );
+}
+const SplitFishbone = memoData(SplitFishboneBase);
 
-          {lc('na',  'Na⁺',  { position: 'absolute', left: 4,       top: 6,       width: v1 - 8 })}
-          {lc('k',   'K⁺',   { position: 'absolute', left: 4,       top: cy + 8,  width: v1 - 8 })}
-          {lc('cl',  'Cl⁻',  { position: 'absolute', left: v1 + 4,  top: 6,       width: v2 - v1 - 8, alignItems: 'center' })}
-          {lc('co2', 'HCO₃', { position: 'absolute', left: v1 + 4,  top: cy + 8,  width: v2 - v1 - 8, alignItems: 'center' })}
-          {lc('bun', 'BUN',  { position: 'absolute', left: v2 + 4,  top: 6,       width: tailX - v2 - 8 })}
-          {lc('cr',  'Cr',   { position: 'absolute', left: v2 + 4,  top: cy + 8,  width: tailX - v2 - 8 })}
-          {lc('glu', 'Glu',  { position: 'absolute', left: gluX + 6, top: cy - 28, width: w - gluX - 10 })}
-        </>
-      )}
+export const BMPFishbone = (p: FishProps) =>
+  <SplitFishbone {...p} top={['na', 'cl', 'bun']} bottom={['k', 'co2', 'cr']} tail="glu" />;
+
+export const LFTFishbone = (p: FishProps) =>
+  <SplitFishbone {...p} top={['ca', 'tp', 'ast', 'ldh']} bottom={['po4', 'alb', 'alt', 'ap']} tail="bili" />;
+
+/** Plain row of cells (Mg + coags). */
+function LabRowBase(props: FishProps & { keys: LabKey[] }) {
+  const c = cellFactory(props, props.keys[props.keys.length - 1]);
+  return (
+    <View style={[st.box, st.row]}>
+      {props.keys.map((k, i) => (
+        <View key={k} style={[st.rowCell, i > 0 && st.rowDivider]}>{c(k, { flex: 1, height: 64 })}</View>
+      ))}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  diagramBox: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: BORDER,
-    overflow: 'hidden',
-  },
-  cell:      { alignItems: 'flex-start' },
-  cellLabel: { fontSize: 10, fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 1 },
-  cellInput: { fontSize: 19, fontWeight: '500', width: '100%', paddingVertical: 0 },
+const st = StyleSheet.create({
+  box:  { backgroundColor: C.surface, borderRadius: R.md, borderWidth: 0.5, borderColor: C.line, overflow: 'hidden' },
+  row:  { flexDirection: 'row' },
+  rowCell: { flex: 1 },
+  rowDivider: { borderLeftWidth: 0.5, borderLeftColor: C.line },
+  cell: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  prev: { ...T.caption, ...T.num, fontSize: 11, fontWeight: '400', height: 14 },
+  input:{ fontSize: 17, fontWeight: '600', ...T.num, minWidth: 44, paddingVertical: 2 },
+  unitLabel: { fontSize: 9, fontWeight: '600', color: C.ink4, letterSpacing: 0.3, height: 12 },
 });
+export const CBCFishbone = memoData(CBCFishboneBase);
+export const LabRow = memoData(LabRowBase);
